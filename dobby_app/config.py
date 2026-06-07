@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_user_id: int = 0
     telegram_webhook_secret: str = ""
+    telegram_poll_interval_seconds: int = 60
     public_webhook_base_url: str = ""
 
     openai_api_key: str = ""

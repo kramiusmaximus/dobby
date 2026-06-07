@@ -29,6 +29,20 @@ services:
       - ./telegram_bot_cli/media_messages:/app/storage/media/media_messages
       - ./data:/app/data
 
+  poller:
+    build: .
+    command: python -m dobby_app.poller
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./wiki:/app/wiki
+      - ./assets:/app/assets
+      - ./telegram_bot_cli/voice_messages:/app/storage/media/voice_messages
+      - ./telegram_bot_cli/media_messages:/app/storage/media/media_messages
+      - ./data:/app/data
+
   scheduler:
     build: .
     command: python -m dobby_app.scheduler

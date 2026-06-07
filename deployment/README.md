@@ -3,6 +3,7 @@
 This deployment runs DOBBY as three app services plus PostgreSQL and Redis:
 
 - `app`: FastAPI Telegram webhook server.
+- `poller`: Telegram long-polling intake loop.
 - `worker`: RQ background worker.
 - `scheduler`: APScheduler process that reads job schedules from PostgreSQL.
 - `postgres`: durable runtime state.
@@ -68,6 +69,18 @@ Reminder and event commands:
 ```
 
 Plain text and transcribed voice messages are routed through the lightweight OpenAI router model configured by `ROUTER_MODEL`.
+
+## Telegram Intake
+
+DOBBY now uses Telegram polling by default, so no public HTTPS webhook is required. Configure these values in `/opt/dobby/.env`:
+
+```env
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_USER_ID=
+TELEGRAM_POLL_INTERVAL_SECONDS=60
+```
+
+The `poller` service disables any existing webhook and calls `getUpdates` every minute.
 
 ## GitHub CI/CD
 
