@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    telegram_bot_token: str = ""
+    telegram_user_id: int = 0
+    telegram_webhook_secret: str = ""
+    public_webhook_base_url: str = ""
+
+    openai_api_key: str = ""
+
+    database_url: str = "sqlite:///./dobby.db"
+    redis_url: str = "redis://localhost:6379/0"
+
+    app_timezone: str = "Europe/Moscow"
+    wiki_root: Path = Path("wiki")
+    media_root: Path = Path("storage/media")
+    automations_root: Path = Path("data/automations")
+
+    ical_caldav_url: str = "https://caldav.icloud.com"
+    ical_caldav_username: str = ""
+    ical_caldav_password: str = ""
+    ical_calendar_name: str = ""
+    ical_reminder_calendar_name: str = ""
+
+    router_model: str = Field("gpt-4.1-mini", alias="ROUTER_MODEL")
+    assistant_model: str = Field("gpt-4.1", alias="ASSISTANT_MODEL")
+    transcription_model: str = Field("gpt-4o-mini-transcribe", alias="TRANSCRIPTION_MODEL")
+    wiki_maintenance_model: str = Field("gpt-4.1", alias="WIKI_MAINTENANCE_MODEL")
+    daily_briefing_model: str = Field("gpt-4.1-mini", alias="DAILY_BRIEFING_MODEL")
+
+
+settings = Settings()
+

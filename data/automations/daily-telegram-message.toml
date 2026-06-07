@@ -1,0 +1,13 @@
+version = 1
+id = "daily-telegram-message"
+kind = "cron"
+name = "DOBBY Daily Telegram Message"
+prompt = "Send Mark separate Telegram messages for:\n1. A wise saying or dark humor joke\n2. Exactly: \"What do you plan to accomplish today?\"\n3. Events/reminders with nearing deadlines (<2 weeks)\n4. Anything else important to Mark\n\nSkip any empty section. For Reminders/Calendar reads, use the DOBBY wrappers in scripts/rem.sh and scripts/ical.sh, not raw CLIs or Calendar MCP. Do not parallelize the first Reminders and Calendar access checks."
+status = "ACTIVE"
+rrule = "RRULE:FREQ=WEEKLY;BYHOUR=9;BYMINUTE=0;BYDAY=SU,MO,TU,WE,TH,FR,SA"
+model = "gpt-5.5"
+reasoning_effort = "medium"
+execution_environment = "local"
+cwds = ["/Users/kramiusmaximus/projects/dobby"]
+created_at = 1779556336117
+updated_at = 1780834451000

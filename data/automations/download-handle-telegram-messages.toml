@@ -1,0 +1,13 @@
+version = 1
+id = "download-handle-telegram-messages"
+kind = "cron"
+name = "DOBBY Download & Handle Telegram Messages"
+prompt = "1. Download new messages from Telegram.\n2. If no new messages received, finish.\n3. If messages include reminder/notification work, use the $reminders skill and /Users/kramiusmaximus/projects/dobby/scripts/rem.sh rather than raw /opt/homebrew/bin/rem. The wrapper runs the serial Reminders warm-up/preflight flow, retries the actual command on cold EventKit/TCC access-denied/not-determined responses, preserves JSON stdout, and logs attempts to /Users/kramiusmaximus/projects/dobby/tmp/eventkit-access.log. Do not parallelize the initial Reminders access sequence. If access succeeds, use rem.sh add/list/search/show/update/complete/uncomplete/delete with --output json --no-color where possible, and verify every write with a follow-up rem.sh search/show/list. Treat Reminders as blocked only if the wrapper command fails after its retries.\n4. If messages include macOS Calendar work, use the $ical skill and /Users/kramiusmaximus/projects/dobby/scripts/ical.sh rather than raw /opt/homebrew/bin/ical or Calendar MCP. For deletion, identify the exact event in JSON, delete by exact event ID, and verify with a follow-up list/search. The wrapper warms Calendar.app, retries cold EventKit/TCC access-denied/not-determined responses, preserves JSON stdout, and logs attempts to /Users/kramiusmaximus/projects/dobby/tmp/eventkit-access.log. Treat Calendar as blocked only if the wrapper command fails after its retries.\n5. Handle new messages fully: create/update Apple Reminders when requested, create/update/delete Calendar events when requested, keep DOBBY wiki records synchronized when durable context is created, and send a concise Telegram acknowledgement using readable formatting and helpful emoji scan markers."
+status = "ACTIVE"
+rrule = "RRULE:FREQ=WEEKLY;BYHOUR=0;BYMINUTE=0;BYDAY=SU,MO,TU,WE,TH,FR,SA"
+model = "gpt-5.5"
+reasoning_effort = "medium"
+execution_environment = "local"
+cwds = ["/Users/kramiusmaximus/projects/dobby"]
+created_at = 1779555417932
+updated_at = 1780631515000

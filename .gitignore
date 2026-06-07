@@ -1,0 +1,16 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
+
+.env
+telegram_bot_cli/.env
+telegram_bot_cli/.telegram_offset
+
+tmp/
+*.log
+
+storage/

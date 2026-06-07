@@ -1,0 +1,1 @@
+"""DOBBY VPS application."""

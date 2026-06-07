@@ -1,0 +1,13 @@
+version = 1
+id = "dobby-wiki-maintenance"
+kind = "cron"
+name = "DOBBY Wiki Maintenance"
+prompt = "Review and tidy the DOBBY wiki according to AGENTS.md. Inspect wiki/index.md first, search the wiki for unresolved wikilinks, empty root-level Obsidian stubs, duplicate or orphan pages, missing or invalid frontmatter, stale links, outdated index entries, obvious organization issues, and reminder/wiki sync drift. Make conservative refactors only: preserve raw sources under wiki/raw, keep canonical compiled pages under wiki/pages, update cross-links and index entries, append a parseable lint entry to wiki/log.md, and summarize changes and remaining suggestions. Also update wiki/pages/projects/wiki-project-improvement-suggestions.md if new project or wiki improvement suggestions arise, grouped by proposer. \n\nIf you notice redundancy in repeated data or any other non-optimalities which result in excess space/notes/complexity and generally ways to improve organization, feel free to suggest solutions."
+status = "ACTIVE"
+rrule = "FREQ=WEEKLY;BYDAY=SU;BYHOUR=10;BYMINUTE=0;BYSECOND=0"
+model = "gpt-5.4"
+reasoning_effort = "medium"
+execution_environment = "local"
+cwds = ["/Users/kramiusmaximus/projects/dobby"]
+created_at = 1779643109407
+updated_at = 1780839057387
