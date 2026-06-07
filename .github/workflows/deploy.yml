@@ -53,7 +53,7 @@ jobs:
           fi
 
           cd "$DEPLOY_PATH"
-          docker compose build app worker scheduler
-          docker compose up -d
+          docker compose build app worker scheduler poller
+          docker compose up -d --force-recreate app worker scheduler poller
           sleep 8
           curl -fsS http://localhost:8000/health
