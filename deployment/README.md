@@ -12,7 +12,7 @@ This deployment runs DOBBY as three app services plus PostgreSQL and Redis:
 
 ```bash
 apt update
-apt install -y git docker.io docker-compose-plugin
+apt install -y git docker.io docker-compose-v2
 systemctl enable --now docker
 git clone git@github.com:kramiusmaximus/dobby.git /opt/dobby
 cd /opt/dobby
@@ -68,3 +68,21 @@ Reminder and event commands:
 ```
 
 Plain text and transcribed voice messages are routed through the lightweight OpenAI router model configured by `ROUTER_MODEL`.
+
+## GitHub CI/CD
+
+The repository includes:
+
+- `.github/workflows/ci.yml`: runs Ruff, pytest, and a Docker build.
+- `.github/workflows/deploy.yml`: deploys successful `main` builds to the VPS.
+
+The deploy workflow expects these repository secrets:
+
+```text
+DEPLOY_HOST=94.241.142.126
+DEPLOY_USER=root
+DEPLOY_PATH=/opt/dobby
+DEPLOY_SSH_KEY=<private SSH key whose public key is in /root/.ssh/authorized_keys>
+```
+
+The deploy job uploads a source archive, preserves `/opt/dobby/.env`, rebuilds the Docker images, runs `docker compose up -d`, and checks `/health`.

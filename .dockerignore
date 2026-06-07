@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+.pytest_cache
+.ruff_cache
+*.egg-info
+__pycache__
+*.py[cod]
+.DS_Store
+.env
+tmp
+storage

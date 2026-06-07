@@ -1,0 +1,76 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: ["completed"]
+    branches: ["main"]
+
+concurrency:
+  group: dobby-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Validate deploy secrets
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_PATH"
+          test -n "$DEPLOY_SSH_KEY"
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/dobby_deploy_key
+          chmod 600 ~/.ssh/dobby_deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Pack release
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.env' \
+            --exclude='.venv' \
+            --exclude='.pytest_cache' \
+            --exclude='.ruff_cache' \
+            --exclude='*.egg-info' \
+            -czf /tmp/dobby-release.tgz .
+
+      - name: Upload release
+        run: |
+          scp -i ~/.ssh/dobby_deploy_key /tmp/dobby-release.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/dobby-release.tgz"
+
+      - name: Deploy release
+        run: |
+          ssh -i ~/.ssh/dobby_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "set -euo pipefail
+             DEPLOY_PATH='$DEPLOY_PATH'
+             mkdir -p \"\$DEPLOY_PATH\"
+             if [ -f \"\$DEPLOY_PATH/.env\" ]; then cp \"\$DEPLOY_PATH/.env\" /tmp/dobby.env; fi
+             find \"\$DEPLOY_PATH\" -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +
+             tar -xzf /tmp/dobby-release.tgz -C \"\$DEPLOY_PATH\"
+             if [ -f /tmp/dobby.env ]; then mv /tmp/dobby.env \"\$DEPLOY_PATH/.env\"; elif [ -f \"\$DEPLOY_PATH/.env.example\" ]; then cp \"\$DEPLOY_PATH/.env.example\" \"\$DEPLOY_PATH/.env\"; fi
+             cd \"\$DEPLOY_PATH\"
+             docker compose build app worker scheduler
+             docker compose up -d
+             sleep 8
+             curl -fsS http://localhost:8000/health"
