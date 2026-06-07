@@ -38,7 +38,7 @@ async def handle_message(message: Message, bot: Bot) -> str | None:
         )
 
         if text.startswith("/"):
-            return handle_command(session, text, sender_id=message.from_user.id if message.from_user else None)
+            return handle_command(session, text)
 
     if not text.strip():
         return None

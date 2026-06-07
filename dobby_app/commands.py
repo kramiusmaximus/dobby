@@ -6,26 +6,24 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from dobby_app.bot_commands import command_help_text
 from dobby_app.caldav_client import create_calendar_item, list_items
 from dobby_app.config import settings
 from dobby_app.jobs import enqueue_job
 from dobby_app.models import CaldavItem, JobRun, ScheduledJob
 from dobby_app.schedules import parse_schedule
 from dobby_app.timeparse import parse_datetime
+from dobby_app.wiki_memory import handle_memory_command
 
 
-def handle_command(session: Session, text: str, *, sender_id: int | None = None) -> str:
+def handle_command(session: Session, text: str) -> str:
     parts = text.strip().split(maxsplit=2)
     command = parts[0].lower()
     rest = text[len(parts[0]) :].strip()
 
-    if command in {"/help", "/commands"}:
-        return command_help_text()
     if command == "/status":
         return status()
-    if command == "/whoami":
-        return f"Your Telegram sender id is {sender_id or 'unknown'}."
+    if command == "/memory":
+        return handle_memory_command(rest)
     if command == "/jobs":
         return list_jobs(session)
     if command == "/queue":

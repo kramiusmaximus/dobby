@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from datetime import datetime
 
 from dobby_app.commands import handle_command
@@ -32,17 +33,16 @@ def test_jobs_lists_configured_jobs(sqlite_session):
     assert "every day at 9:00" in response
 
 
-def test_help_lists_commands(sqlite_session):
-    response = handle_command(sqlite_session, "/help")
-
-    assert "/remind <title> at <time>" in response
-    assert "/job schedule <name> <schedule>" in response
+def test_removed_help_command_is_unknown(sqlite_session):
+    assert handle_command(sqlite_session, "/help") == "Unknown command."
 
 
-def test_commands_alias_lists_commands(sqlite_session):
-    response = handle_command(sqlite_session, "/commands")
+def test_removed_commands_alias_is_unknown(sqlite_session):
+    assert handle_command(sqlite_session, "/commands") == "Unknown command."
 
-    assert "DOBBY commands:" in response
+
+def test_removed_whoami_command_is_unknown(sqlite_session):
+    assert handle_command(sqlite_session, "/whoami") == "Unknown command."
 
 
 def test_status_reports_polling(sqlite_session):
@@ -52,10 +52,47 @@ def test_status_reports_polling(sqlite_session):
     assert "polling every" in response
 
 
-def test_whoami_reports_sender_id(sqlite_session):
-    response = handle_command(sqlite_session, "/whoami", sender_id=12345)
+def test_memory_queries_wiki(monkeypatch, tmp_path, sqlite_session):
+    wiki = tmp_path / "wiki"
+    page = wiki / "pages" / "projects" / "studio.md"
+    page.parent.mkdir(parents=True)
+    page.write_text(
+        """---
+title: Studio Project
+type: project
+created: 2026-06-07
+updated: 2026-06-07
+status: active
+tags: []
+sources: []
+---
 
-    assert response == "Your Telegram sender id is 12345."
+# Studio Project
+
+Mark wants a projection installation with TouchDesigner.
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("dobby_app.wiki_memory.settings.wiki_root", wiki)
+
+    response = handle_command(sqlite_session, "/memory TouchDesigner")
+
+    assert "Memory matches for: TouchDesigner" in response
+    assert "Studio Project" in response
+
+
+def test_memory_save_updates_obsidian_wiki(monkeypatch, tmp_path, sqlite_session):
+    wiki = tmp_path / "wiki"
+    monkeypatch.setattr("dobby_app.wiki_memory.settings.wiki_root", wiki)
+
+    response = handle_command(sqlite_session, "/memory save Mark prefers concise Telegram acknowledgements")
+
+    assert response == "Saved to memory."
+    inbox = wiki / "pages" / "concepts" / "telegram-memory-inbox.md"
+    assert "Mark prefers concise Telegram acknowledgements" in inbox.read_text(encoding="utf-8")
+    assert f"## [{date.today().isoformat()}] memory | Telegram Memory Inbox" in (wiki / "log.md").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_queue_lists_recent_job_runs(sqlite_session):
