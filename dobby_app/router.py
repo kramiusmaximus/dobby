@@ -18,6 +18,8 @@ class RoutedAction:
 
 ROUTER_SCHEMA = {
     "name": "dobby_route",
+    "type": "json_schema",
+    "strict": True,
     "schema": {
         "type": "object",
         "additionalProperties": False,
@@ -38,14 +40,15 @@ ROUTER_SCHEMA = {
             "clarification": {"type": ["string", "null"]},
             "arguments": {
                 "type": "object",
-                "additionalProperties": True,
+                "additionalProperties": False,
                 "properties": {
-                    "title": {"type": "string"},
-                    "datetime": {"type": "string"},
-                    "duration_minutes": {"type": "integer"},
-                    "alarm_minutes_before": {"type": "integer"},
-                    "query": {"type": "string"},
+                    "title": {"type": ["string", "null"]},
+                    "datetime": {"type": ["string", "null"]},
+                    "duration_minutes": {"type": ["integer", "null"]},
+                    "alarm_minutes_before": {"type": ["integer", "null"]},
+                    "query": {"type": ["string", "null"]},
                 },
+                "required": ["title", "datetime", "duration_minutes", "alarm_minutes_before", "query"],
             },
         },
         "required": ["action", "confidence", "clarification", "arguments"],
@@ -76,7 +79,7 @@ async def route_message(text: str) -> RoutedAction:
             },
             {"role": "user", "content": text},
         ],
-        text={"format": {"type": "json_schema", "json_schema": ROUTER_SCHEMA}},
+        text={"format": ROUTER_SCHEMA},
     )
     payload = json.loads(response.output_text)
     return RoutedAction(
