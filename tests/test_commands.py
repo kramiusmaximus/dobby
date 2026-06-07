@@ -32,6 +32,32 @@ def test_jobs_lists_configured_jobs(sqlite_session):
     assert "every day at 9:00" in response
 
 
+def test_help_lists_commands(sqlite_session):
+    response = handle_command(sqlite_session, "/help")
+
+    assert "/remind <title> at <time>" in response
+    assert "/job schedule <name> <schedule>" in response
+
+
+def test_commands_alias_lists_commands(sqlite_session):
+    response = handle_command(sqlite_session, "/commands")
+
+    assert "DOBBY commands:" in response
+
+
+def test_status_reports_polling(sqlite_session):
+    response = handle_command(sqlite_session, "/status")
+
+    assert "DOBBY is running" in response
+    assert "polling every" in response
+
+
+def test_whoami_reports_sender_id(sqlite_session):
+    response = handle_command(sqlite_session, "/whoami", sender_id=12345)
+
+    assert response == "Your Telegram sender id is 12345."
+
+
 def test_queue_lists_recent_job_runs(sqlite_session):
     job = _add_job(sqlite_session)
     sqlite_session.add(JobRun(scheduled_job_id=job.id, status="failed", error="boom"))

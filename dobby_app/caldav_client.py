@@ -32,7 +32,8 @@ def _calendar(name: str | None = None):
         for calendar in calendars:
             if calendar.name == preferred:
                 return calendar
-        raise RuntimeError(f"CalDAV calendar not found: {preferred}")
+        available = ", ".join(calendar.name for calendar in calendars) or "<none>"
+        raise RuntimeError(f"CalDAV calendar not found: {preferred}. Available calendars: {available}")
     if not calendars:
         raise RuntimeError("No CalDAV calendars found")
     return calendars[0]

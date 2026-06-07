@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 from fastapi import FastAPI, Header, HTTPException, Request
 
+from dobby_app.bot_commands import register_bot_commands
 from dobby_app.config import settings
 from dobby_app.db import init_db, session_scope
 from dobby_app.message_handler import reply_to_message
@@ -21,6 +22,8 @@ async def lifespan(app: FastAPI):
     init_db()
     with session_scope() as session:
         seed_default_jobs(session)
+    if bot:
+        await register_bot_commands(bot)
     yield
 
 

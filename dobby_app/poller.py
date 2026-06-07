@@ -6,6 +6,7 @@ import logging
 from aiogram import Bot
 from aiogram.types import Update
 
+from dobby_app.bot_commands import register_bot_commands
 from dobby_app.config import settings
 from dobby_app.db import init_db, session_scope
 from dobby_app.message_handler import reply_to_message
@@ -29,6 +30,7 @@ async def poll_forever() -> None:
 
     try:
         await bot.delete_webhook(drop_pending_updates=False)
+        await register_bot_commands(bot)
         logger.info("Telegram webhook disabled; polling every %s seconds", settings.telegram_poll_interval_seconds)
 
         while True:
