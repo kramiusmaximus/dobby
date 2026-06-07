@@ -8,12 +8,14 @@ from dobby_app.db import session_scope
 from dobby_app.models import TelegramMessage
 from dobby_app.router import assistant_chat, route_message
 from dobby_app.timeparse import parse_datetime
+from dobby_app.transcription import download_voice, transcribe_audio
 
 
-async def handle_message(message: Message) -> str:
+async def handle_message(message: Message, bot: Bot) -> str:
     text = message.text or message.caption or ""
     if message.voice:
-        text = "[voice transcription pending]"
+        voice_path = await download_voice(message, bot)
+        text = await transcribe_audio(voice_path)
 
     with session_scope() as session:
         session.add(
@@ -98,5 +100,5 @@ def _create_routed_item(
 
 
 async def reply_to_message(bot: Bot, message: Message) -> None:
-    response = await handle_message(message)
+    response = await handle_message(message, bot)
     await bot.send_message(message.chat.id, response, disable_web_page_preview=True)
