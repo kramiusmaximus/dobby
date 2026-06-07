@@ -37,14 +37,19 @@ jobs:
             --exclude='.git' \
             --exclude='.github' \
             --exclude='.env' \
+            --exclude='wiki' \
             --exclude='.venv' \
             --exclude='.pytest_cache' \
             --exclude='.ruff_cache' \
             --exclude='*.egg-info' \
             -czf /tmp/dobby-release.tgz .
 
-          find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +
+          find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name .env ! -name wiki -exec rm -rf {} +
           tar -xzf /tmp/dobby-release.tgz -C "$DEPLOY_PATH"
+
+          if [ ! -d "$DEPLOY_PATH/wiki" ] && [ -d wiki ]; then
+            cp -a wiki "$DEPLOY_PATH/wiki"
+          fi
 
           if [ -f /tmp/dobby.env ]; then
             mv /tmp/dobby.env "$DEPLOY_PATH/.env"
