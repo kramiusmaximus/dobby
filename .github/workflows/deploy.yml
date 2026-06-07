@@ -41,7 +41,6 @@ jobs:
           chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/dobby_deploy_key
           chmod 600 ~/.ssh/dobby_deploy_key
-          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
       - name: Pack release
         run: |
@@ -57,11 +56,11 @@ jobs:
 
       - name: Upload release
         run: |
-          scp -i ~/.ssh/dobby_deploy_key /tmp/dobby-release.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/dobby-release.tgz"
+          scp -o StrictHostKeyChecking=accept-new -i ~/.ssh/dobby_deploy_key /tmp/dobby-release.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/dobby-release.tgz"
 
       - name: Deploy release
         run: |
-          ssh -i ~/.ssh/dobby_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/dobby_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
             "set -euo pipefail
              DEPLOY_PATH='$DEPLOY_PATH'
              mkdir -p \"\$DEPLOY_PATH\"
