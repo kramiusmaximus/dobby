@@ -18,4 +18,4 @@ def test_parse_hourly_schedule():
 
 def test_rrule_to_cron():
     parsed = rrule_to_cron("RRULE:FREQ=WEEKLY;BYHOUR=9;BYMINUTE=0;BYDAY=SU,MO")
-    assert parsed.cron == {"hour": 9, "minute": 0, "day_of_week": "su,mo"}
+    assert parsed.cron == {"hour": 9, "minute": 0, "day_of_week": "sun,mon"}

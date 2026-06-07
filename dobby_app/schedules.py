@@ -60,7 +60,7 @@ def rrule_to_cron(text: str) -> ParsedSchedule:
     if "BYMINUTE" in parts:
         cron["minute"] = int(parts["BYMINUTE"].split(",")[0])
     if "BYDAY" in parts:
-        cron["day_of_week"] = ",".join(day[:2].lower() for day in parts["BYDAY"].split(","))
+        cron["day_of_week"] = ",".join(_rrule_day_to_cron(day) for day in parts["BYDAY"].split(","))
     if parts.get("FREQ") == "DAILY":
         cron.setdefault("hour", 0)
         cron.setdefault("minute", 0)
@@ -74,4 +74,33 @@ def rrule_to_cron(text: str) -> ParsedSchedule:
 
 
 def cron_trigger(cron: dict, timezone: str) -> CronTrigger:
-    return CronTrigger(timezone=timezone, **cron)
+    normalized = dict(cron)
+    if "day_of_week" in normalized:
+        normalized["day_of_week"] = ",".join(
+            _normalize_cron_day(day) for day in str(normalized["day_of_week"]).split(",")
+        )
+    return CronTrigger(timezone=timezone, **normalized)
+
+
+def _rrule_day_to_cron(day: str) -> str:
+    return {
+        "MO": "mon",
+        "TU": "tue",
+        "WE": "wed",
+        "TH": "thu",
+        "FR": "fri",
+        "SA": "sat",
+        "SU": "sun",
+    }[day.upper()]
+
+
+def _normalize_cron_day(day: str) -> str:
+    return {
+        "mo": "mon",
+        "tu": "tue",
+        "we": "wed",
+        "th": "thu",
+        "fr": "fri",
+        "sa": "sat",
+        "su": "sun",
+    }.get(day.lower(), day.lower())
