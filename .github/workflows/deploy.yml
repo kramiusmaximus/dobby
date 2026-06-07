@@ -18,6 +18,7 @@ jobs:
 
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -31,6 +32,7 @@ jobs:
       - name: Validate deploy secrets
         run: |
           test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_PORT"
           test -n "$DEPLOY_USER"
           test -n "$DEPLOY_PATH"
           test -n "$DEPLOY_SSH_KEY"
@@ -56,11 +58,11 @@ jobs:
 
       - name: Upload release
         run: |
-          scp -o StrictHostKeyChecking=accept-new -i ~/.ssh/dobby_deploy_key /tmp/dobby-release.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/dobby-release.tgz"
+          scp -o StrictHostKeyChecking=accept-new -P "$DEPLOY_PORT" -i ~/.ssh/dobby_deploy_key /tmp/dobby-release.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/dobby-release.tgz"
 
       - name: Deploy release
         run: |
-          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/dobby_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -o StrictHostKeyChecking=accept-new -p "$DEPLOY_PORT" -i ~/.ssh/dobby_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
             "set -euo pipefail
              DEPLOY_PATH='$DEPLOY_PATH'
              mkdir -p \"\$DEPLOY_PATH\"
