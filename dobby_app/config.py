@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     wiki_maintenance_model: str = Field("gpt-4.1", alias="WIKI_MAINTENANCE_MODEL")
     daily_briefing_model: str = Field("gpt-4.1-mini", alias="DAILY_BRIEFING_MODEL")
 
+    @field_validator("telegram_user_id", mode="before")
+    @classmethod
+    def empty_user_id_is_zero(cls, value: object) -> object:
+        if value == "":
+            return 0
+        return value
+
 
 settings = Settings()
-
