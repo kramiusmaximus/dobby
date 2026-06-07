@@ -1,14 +1,135 @@
 # DOBBY
 
-DOBBY is Mark's personal Telegram assistant and persistent Markdown wiki.
+DOBBY is Mark's VPS-hosted personal Telegram assistant and persistent Obsidian-style Markdown memory vault.
 
-The current VPS app lives in `dobby_app/` and provides:
+The project has been migrated from local/macOS automation toward a long-running Linux service. Telegram is the user interface; the durable center of the system is the `wiki/` vault.
 
-- Telegram webhook handling.
-- OpenAI-backed routing for plain messages.
-- CalDAV calendar events and calendar-based reminders.
-- PostgreSQL-backed configurable jobs.
-- Redis/RQ background execution.
-- Docker Compose deployment.
+## Current Production Shape
 
-See `deployment/README.md` for VPS setup.
+DOBBY now runs on the VPS at `/opt/dobby` through Docker Compose:
+
+- `poller`: Telegram polling intake, every 60 seconds.
+- `app`: FastAPI service and health endpoint.
+- `worker`: background job worker.
+- `scheduler`: scheduled job process backed by PostgreSQL.
+- `postgres`: runtime state for jobs, queue history, Telegram records, and CalDAV item records.
+- `redis`: queue backend.
+
+The bot no longer requires a public Telegram webhook. The poller disables any existing webhook on startup and uses Telegram `getUpdates`.
+
+## Persistent Memory
+
+The previous Obsidian vault has been copied to the VPS at:
+
+```text
+/opt/dobby/wiki
+```
+
+The deployment workflow now preserves `/opt/dobby/wiki` across releases. This is important because Telegram memory commands can update the vault at runtime.
+
+Local vault path:
+
+```text
+wiki/
+```
+
+The vault includes:
+
+- `.obsidian/` configuration.
+- `index.md` and `log.md`.
+- compiled memory pages under `wiki/pages/`.
+- immutable source notes under `wiki/raw/sources/`.
+- raw Telegram assets under `wiki/raw/assets/`.
+
+## Telegram Commands
+
+Registered bot commands:
+
+```text
+/status
+/memory
+/jobs
+/queue
+/today
+/upcoming
+/remind
+/event
+/job
+```
+
+Memory commands:
+
+```text
+/memory <query>
+/memory save <durable note>
+```
+
+Calendar commands:
+
+```text
+/today
+/upcoming
+/remind Call dentist at tomorrow 9
+/event Studio visit at Friday 15:00
+```
+
+Job commands:
+
+```text
+/jobs
+/queue
+/job show <name>
+/job run <name>
+/job pause <name>
+/job resume <name>
+/job schedule <name> every 2 hours
+/job retry <run_id>
+```
+
+Plain text and voice messages without slash commands are routed through OpenAI using the model constants in `dobby_app/config.py`.
+
+Every Telegram message should receive either a response, a failure reply with context, or a thumbs-up acknowledgement.
+
+## Calendar
+
+DOBBY uses iCloud Calendar over CalDAV.
+
+Current VPS configuration:
+
+- Main event calendar: `Личный`
+- Reminder-style events: `Calendar`
+
+The iCloud calendar named `Reminders ⚠️` is visible but rejects CalDAV writes with `403 Forbidden`, so DOBBY stores reminders as timed calendar events with alarms in a writable calendar.
+
+## CI/CD
+
+GitHub Actions runs:
+
+- Ruff.
+- pytest.
+- Docker build.
+- VPS deploy after successful `main` CI.
+
+Deployment runs on the VPS self-hosted runner labeled `dobby-vps`. The deploy workflow preserves:
+
+- `/opt/dobby/.env`
+- `/opt/dobby/wiki`
+
+See `deployment/README.md` for server setup and operational details.
+
+## Local Development
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+.venv/bin/python -m ruff check .
+.venv/bin/python -m pytest -q
+```
+
+Run locally with Docker:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+curl http://localhost:8000/health
+```
