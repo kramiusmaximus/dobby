@@ -13,15 +13,11 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to VPS
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, dobby-vps]
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_PATH: /opt/dobby
 
     steps:
       - name: Check out repository
@@ -29,23 +25,14 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Validate deploy secrets
+      - name: Deploy release
         run: |
-          test -n "$DEPLOY_HOST"
-          test -n "$DEPLOY_PORT"
-          test -n "$DEPLOY_USER"
-          test -n "$DEPLOY_PATH"
-          test -n "$DEPLOY_SSH_KEY"
+          set -euo pipefail
+          mkdir -p "$DEPLOY_PATH"
+          if [ -f "$DEPLOY_PATH/.env" ]; then
+            cp "$DEPLOY_PATH/.env" /tmp/dobby.env
+          fi
 
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/dobby_deploy_key
-          chmod 600 ~/.ssh/dobby_deploy_key
-
-      - name: Pack release
-        run: |
           tar \
             --exclude='.git' \
             --exclude='.github' \
@@ -56,22 +43,17 @@ jobs:
             --exclude='*.egg-info' \
             -czf /tmp/dobby-release.tgz .
 
-      - name: Upload release
-        run: |
-          scp -o StrictHostKeyChecking=accept-new -P "$DEPLOY_PORT" -i ~/.ssh/dobby_deploy_key /tmp/dobby-release.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/dobby-release.tgz"
+          find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +
+          tar -xzf /tmp/dobby-release.tgz -C "$DEPLOY_PATH"
 
-      - name: Deploy release
-        run: |
-          ssh -o StrictHostKeyChecking=accept-new -p "$DEPLOY_PORT" -i ~/.ssh/dobby_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
-            "set -euo pipefail
-             DEPLOY_PATH='$DEPLOY_PATH'
-             mkdir -p \"\$DEPLOY_PATH\"
-             if [ -f \"\$DEPLOY_PATH/.env\" ]; then cp \"\$DEPLOY_PATH/.env\" /tmp/dobby.env; fi
-             find \"\$DEPLOY_PATH\" -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +
-             tar -xzf /tmp/dobby-release.tgz -C \"\$DEPLOY_PATH\"
-             if [ -f /tmp/dobby.env ]; then mv /tmp/dobby.env \"\$DEPLOY_PATH/.env\"; elif [ -f \"\$DEPLOY_PATH/.env.example\" ]; then cp \"\$DEPLOY_PATH/.env.example\" \"\$DEPLOY_PATH/.env\"; fi
-             cd \"\$DEPLOY_PATH\"
-             docker compose build app worker scheduler
-             docker compose up -d
-             sleep 8
-             curl -fsS http://localhost:8000/health"
+          if [ -f /tmp/dobby.env ]; then
+            mv /tmp/dobby.env "$DEPLOY_PATH/.env"
+          elif [ -f "$DEPLOY_PATH/.env.example" ]; then
+            cp "$DEPLOY_PATH/.env.example" "$DEPLOY_PATH/.env"
+          fi
+
+          cd "$DEPLOY_PATH"
+          docker compose build app worker scheduler
+          docker compose up -d
+          sleep 8
+          curl -fsS http://localhost:8000/health

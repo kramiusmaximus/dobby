@@ -79,11 +79,7 @@ The repository includes:
 The deploy workflow expects these repository secrets:
 
 ```text
-DEPLOY_HOST=94.241.142.126
-DEPLOY_PORT=2222
-DEPLOY_USER=root
-DEPLOY_PATH=/opt/dobby
-DEPLOY_SSH_KEY=<private SSH key whose public key is in /root/.ssh/authorized_keys>
+none
 ```
 
-The deploy job uploads a source archive, preserves `/opt/dobby/.env`, rebuilds the Docker images, runs `docker compose up -d`, and checks `/health`.
+The deploy job runs on the VPS through the `dobby-vps` GitHub self-hosted runner. It preserves `/opt/dobby/.env`, rebuilds the Docker images, runs `docker compose up -d`, and checks `/health`.
