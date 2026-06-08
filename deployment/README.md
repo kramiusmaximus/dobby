@@ -68,6 +68,8 @@ Reminder and event commands:
 /upcoming
 ```
 
+Reminder and event writes update the Obsidian wiki calendar page first, then write to CalDAV. Treat CalDAV as the notification transport and the mounted `wiki/` vault as DOBBY's source of truth.
+
 Plain text and transcribed voice messages are routed through the lightweight OpenAI router model configured by `ROUTER_MODEL`.
 
 ## Telegram Intake

@@ -2,7 +2,7 @@
 
 DOBBY is Mark's VPS-hosted personal Telegram assistant and persistent Obsidian-style Markdown memory vault.
 
-The project has been migrated from local/macOS automation toward a long-running Linux service. Telegram is the user interface; the durable center of the system is the `wiki/` vault.
+The project has been migrated from local/macOS automation toward a long-running Linux service. Telegram is the user interface; the durable center of the system is the `wiki/` vault. Obsidian is DOBBY's source of truth for memory, including reminder and calendar context.
 
 ## Current Production Shape
 
@@ -92,7 +92,9 @@ Every Telegram message should receive either a response, a failure reply with co
 
 ## Calendar
 
-DOBBY uses iCloud Calendar over CalDAV.
+DOBBY uses Obsidian as the source of truth for calendar and reminder context. iCloud Calendar over CalDAV is the production delivery and notification transport.
+
+Reminder and event requests sync the relevant Obsidian wiki calendar page before writing to CalDAV.
 
 Current VPS configuration:
 

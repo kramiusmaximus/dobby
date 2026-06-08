@@ -12,7 +12,7 @@ from dobby_app.jobs import enqueue_job
 from dobby_app.models import CaldavItem, JobRun, ScheduledJob
 from dobby_app.schedules import parse_schedule
 from dobby_app.timeparse import parse_datetime
-from dobby_app.wiki_memory import handle_memory_command
+from dobby_app.wiki_memory import handle_memory_command, sync_calendar_item_to_wiki, sync_calendar_snapshot_to_wiki
 
 
 def handle_command(session: Session, text: str) -> str:
@@ -113,6 +113,7 @@ def handle_job_command(session: Session, rest: str) -> str:
 
 def create_from_text(session: Session, text: str, item_type: str) -> str:
     title, starts_at = _split_title_datetime(text)
+    wiki_page = sync_calendar_item_to_wiki(title=title, starts_at=starts_at, item_type=item_type)
     result = create_calendar_item(
         title=title,
         starts_at=starts_at,
@@ -127,6 +128,7 @@ def create_from_text(session: Session, text: str, item_type: str) -> str:
         starts_at=starts_at,
         ends_at=starts_at + timedelta(minutes=15),
         alarm_minutes_before=0 if item_type == "reminder" else None,
+        wiki_page=wiki_page,
     )
     session.add(item)
     return f"Created {item_type}: {title} at {starts_at}."
@@ -136,6 +138,7 @@ def upcoming(days: int) -> str:
     tz = ZoneInfo(settings.app_timezone)
     now = datetime.now(tz)
     items = list_items(now, now + timedelta(days=days))
+    sync_calendar_snapshot_to_wiki(items)
     if not items:
         return "Nothing scheduled."
     return "\n".join(f"- {item['summary']} — {item['start']}" for item in items)

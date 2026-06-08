@@ -5,7 +5,7 @@ from datetime import datetime
 
 from dobby_app.commands import handle_command
 from dobby_app.caldav_client import CalendarWriteResult
-from dobby_app.models import JobRun, ScheduledJob
+from dobby_app.models import CaldavItem, JobRun, ScheduledJob
 
 
 def _add_job(sqlite_session, *, enabled: bool = True) -> ScheduledJob:
@@ -109,41 +109,53 @@ def test_queue_lists_recent_job_runs(sqlite_session):
 
 def test_today_lists_one_day_of_calendar_items(monkeypatch, sqlite_session):
     captured = {}
+    synced = []
 
     def fake_list_items(start, end):
         captured["days"] = (end - start).days
         return [{"summary": "Dentist", "start": datetime(2026, 6, 8, 9, 0)}]
 
     monkeypatch.setattr("dobby_app.commands.list_items", fake_list_items)
+    monkeypatch.setattr("dobby_app.commands.sync_calendar_snapshot_to_wiki", lambda items: synced.extend(items))
 
     response = handle_command(sqlite_session, "/today")
 
     assert captured["days"] == 1
+    assert synced == [{"summary": "Dentist", "start": datetime(2026, 6, 8, 9, 0)}]
     assert "Dentist" in response
 
 
 def test_upcoming_lists_fourteen_days_of_calendar_items(monkeypatch, sqlite_session):
     captured = {}
+    synced = []
 
     def fake_list_items(start, end):
         captured["days"] = (end - start).days
         return [{"summary": "Studio", "start": datetime(2026, 6, 12, 15, 0)}]
 
     monkeypatch.setattr("dobby_app.commands.list_items", fake_list_items)
+    monkeypatch.setattr("dobby_app.commands.sync_calendar_snapshot_to_wiki", lambda items: synced.extend(items))
 
     response = handle_command(sqlite_session, "/upcoming")
 
     assert captured["days"] == 14
+    assert synced == [{"summary": "Studio", "start": datetime(2026, 6, 12, 15, 0)}]
     assert "Studio" in response
 
 
 def test_remind_creates_calendar_reminder(monkeypatch, sqlite_session):
     created = {}
+    calls = []
     starts_at = datetime(2026, 6, 8, 9, 0)
 
     monkeypatch.setattr("dobby_app.commands.parse_datetime", lambda text: starts_at)
+    monkeypatch.setattr(
+        "dobby_app.commands.sync_calendar_item_to_wiki",
+        lambda **kwargs: calls.append(("wiki", kwargs)) or "pages/calendar/june-2026-commitments.md",
+    )
 
     def fake_create_calendar_item(**kwargs):
+        calls.append(("caldav", kwargs))
         created.update(kwargs)
         return CalendarWriteResult(uid="reminder-uid", url="caldav://reminder")
 
@@ -154,16 +166,25 @@ def test_remind_creates_calendar_reminder(monkeypatch, sqlite_session):
     assert created["title"] == "Call dentist"
     assert created["item_type"] == "reminder"
     assert created["alarm_minutes_before"] == 0
+    assert [name for name, _ in calls] == ["wiki", "caldav"]
+    item = sqlite_session.query(CaldavItem).filter_by(uid="reminder-uid").one()
+    assert item.wiki_page == "pages/calendar/june-2026-commitments.md"
     assert "Created reminder: Call dentist" in response
 
 
 def test_event_creates_calendar_event(monkeypatch, sqlite_session):
     created = {}
+    calls = []
     starts_at = datetime(2026, 6, 12, 15, 0)
 
     monkeypatch.setattr("dobby_app.commands.parse_datetime", lambda text: starts_at)
+    monkeypatch.setattr(
+        "dobby_app.commands.sync_calendar_item_to_wiki",
+        lambda **kwargs: calls.append(("wiki", kwargs)) or "pages/calendar/june-2026-commitments.md",
+    )
 
     def fake_create_calendar_item(**kwargs):
+        calls.append(("caldav", kwargs))
         created.update(kwargs)
         return CalendarWriteResult(uid="event-uid", url="caldav://event")
 
@@ -174,6 +195,9 @@ def test_event_creates_calendar_event(monkeypatch, sqlite_session):
     assert created["title"] == "Studio visit"
     assert created["item_type"] == "event"
     assert created["alarm_minutes_before"] is None
+    assert [name for name, _ in calls] == ["wiki", "caldav"]
+    item = sqlite_session.query(CaldavItem).filter_by(uid="event-uid").one()
+    assert item.wiki_page == "pages/calendar/june-2026-commitments.md"
     assert "Created event: Studio visit" in response
 
 
