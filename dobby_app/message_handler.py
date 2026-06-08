@@ -13,9 +13,11 @@ from dobby_app.models import TelegramMessage
 from dobby_app.router import assistant_chat, route_message
 from dobby_app.timeparse import parse_datetime
 from dobby_app.transcription import download_voice, transcribe_audio
+from dobby_app.wiki_memory import save_memory_note
 
 
 logger = logging.getLogger(__name__)
+DAILY_PLAN_PROMPT = "What do you plan to accomplish today?"
 
 
 async def handle_message(message: Message, bot: Bot) -> str | None:
@@ -39,6 +41,9 @@ async def handle_message(message: Message, bot: Bot) -> str | None:
 
         if text.startswith("/"):
             return handle_command(session, text)
+
+    if _is_daily_plan_reply(message):
+        return _save_daily_plan_response(text)
 
     if not text.strip():
         return None
@@ -106,6 +111,22 @@ def _create_routed_item(
             )
         )
     return f"Created {item_type}: {title} at {starts_at}."
+
+
+def _is_daily_plan_reply(message: Message) -> bool:
+    reply = message.reply_to_message
+    if not reply:
+        return False
+    prompt_text = reply.text or reply.caption or ""
+    return DAILY_PLAN_PROMPT in prompt_text
+
+
+def _save_daily_plan_response(text: str) -> str | None:
+    plan = text.strip()
+    if not plan:
+        return None
+    save_memory_note(f"Daily plan: {plan}")
+    return "Saved today's plan to Obsidian."
 
 
 async def reply_to_message(bot: Bot, message: Message) -> None:
