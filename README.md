@@ -96,15 +96,15 @@ Every Telegram message should receive either a response, a failure reply with co
 DOBBY memory queries and wiki writes use the Obsidian Local REST API plugin:
 
 ```env
-OBSIDIAN_API_URL=http://127.0.0.1:27123
+OBSIDIAN_API_URL=http://obsidian:27123
 OBSIDIAN_API_KEY=
 OBSIDIAN_VERIFY_TLS=false
 OBSIDIAN_ENABLED=
 ```
 
-`OBSIDIAN_ENABLED` can be left empty; DOBBY enables Obsidian automatically when `OBSIDIAN_API_KEY` is configured. Production uses the Local REST API plugin over localhost HTTP on port `27123`; HTTPS mode is intentionally disabled because the API is not exposed publicly.
+`OBSIDIAN_ENABLED` can be left empty; DOBBY enables Obsidian automatically when `OBSIDIAN_API_KEY` is configured. Production uses the Local REST API plugin over Compose-internal HTTP at `http://obsidian:27123`; HTTPS mode is intentionally disabled because the API is not exposed publicly.
 
-The `obsidian` Compose service uses `lscr.io/linuxserver/obsidian:latest`, mounts the vault at `/config/dobby`, and persists the Obsidian desktop profile in `obsidian-config/`. `deployment/setup_obsidian_local_rest.py` installs/configures the plugin from the deployment host without committing plugin files or API keys.
+The `obsidian` Compose service uses `lscr.io/linuxserver/obsidian:latest`, publishes the API only on VPS loopback for host diagnostics, mounts the vault at `/config/dobby`, and persists the Obsidian desktop profile in `obsidian-config/`. `deployment/setup_obsidian_local_rest.py` installs/configures the plugin from the deployment host without committing plugin files or API keys.
 
 ## Calendar
 

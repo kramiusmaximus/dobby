@@ -72,7 +72,7 @@ def main() -> int:
     _write_env(
         env_path,
         {
-            "OBSIDIAN_API_URL": "http://127.0.0.1:27123",
+            "OBSIDIAN_API_URL": "http://obsidian:27123",
             "OBSIDIAN_API_KEY": api_key,
             "OBSIDIAN_VERIFY_TLS": "false",
             "OBSIDIAN_ENABLED": "true",
@@ -132,7 +132,7 @@ def main() -> int:
         + "\n"
     )
     (app_profile / "dobby.json").write_text(json.dumps({"frame": "native"}, indent=2) + "\n")
-    print("Obsidian Local REST API configured for http://127.0.0.1:27123")
+    print("Obsidian Local REST API configured for http://obsidian:27123")
     return 0
 
 

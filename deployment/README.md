@@ -29,7 +29,7 @@ docker compose up -d --build
 curl http://localhost:8000/health
 ```
 
-The Obsidian API is served by the Local REST API plugin on localhost HTTP port `27123`. HTTPS mode is disabled because the endpoint is bound only to the VPS loopback interface.
+The Obsidian API is served by the Local REST API plugin on HTTP port `27123`. DOBBY containers use the Compose-internal URL `http://obsidian:27123`; the same port is also bound to `127.0.0.1` on the VPS for host diagnostics. HTTPS mode is disabled.
 
 On a brand-new Obsidian profile, open the Obsidian GUI through an SSH tunnel to port `3001` and accept the vault author trust prompt once so community plugins can run. The trust decision is stored under `obsidian-config/`.
 

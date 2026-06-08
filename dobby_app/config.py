@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
 
-    obsidian_api_url: str = "http://127.0.0.1:27123"
+    obsidian_api_url: str = "http://obsidian:27123"
     obsidian_api_key: str = ""
     obsidian_verify_tls: bool = Field(False, alias="OBSIDIAN_VERIFY_TLS")
     obsidian_enabled: bool | None = Field(None, alias="OBSIDIAN_ENABLED")
