@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+import asyncio
+from datetime import timedelta
+
+from dobby_app.jobs import _daily_briefing
+
+
+def test_daily_briefing_sends_four_formatted_messages(monkeypatch, tmp_path):
+    sent = []
+    captured = {}
+    wiki_root = tmp_path / "wiki"
+    goal = wiki_root / "pages" / "goals" / "gift.md"
+    goal.parent.mkdir(parents=True)
+    goal.write_text(
+        """---
+title: Gift
+type: goal
+created: 2026-06-08
+updated: 2026-06-08
+status: active
+tags: []
+sources: []
+---
+
+# Gift
+
+## Goal
+
+Buy the present before the birthday.
+""",
+        encoding="utf-8",
+    )
+
+    def fake_list_items(start, end):
+        captured["start"] = start
+        captured["end"] = end
+        return [
+            {"summary": "Dentist", "start": start.replace(hour=9)},
+            {"summary": "Studio", "start": start + timedelta(days=3, hours=15)},
+        ]
+
+    async def fake_send_telegram_message(text):
+        sent.append(text)
+
+    monkeypatch.setattr("dobby_app.jobs.random.choice", lambda options: options[0])
+    monkeypatch.setattr("dobby_app.jobs.list_items", fake_list_items)
+    monkeypatch.setattr("dobby_app.jobs.send_telegram_message", fake_send_telegram_message)
+    monkeypatch.setattr("dobby_app.jobs.settings.wiki_root", wiki_root)
+
+    result = asyncio.run(_daily_briefing())
+
+    assert result == {"sent": True, "upcoming_count": 2}
+    assert len(sent) == 4
+    assert sent[0].startswith("Start\n\n")
+    assert "Calendar and Reminders" in sent[1]
+    assert "Today\n- " in sent[1]
+    assert "Dentist" in sent[1]
+    assert "Next 2 Weeks\n- " in sent[1]
+    assert "Studio" in sent[1]
+    assert sent[2].startswith("Other Important Reminders\n\n")
+    assert "Gift: Buy the present before the birthday." in sent[2]
+    assert sent[3] == "Today\n\nWhat do you plan to accomplish today?"
+    assert captured["start"].hour == 0
+    assert captured["start"].minute == 0
+    assert (captured["end"] - captured["start"]).days == 14
