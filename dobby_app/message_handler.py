@@ -6,6 +6,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message
 from aiogram.types import ReactionTypeEmoji
+from sqlalchemy import select
 
 from dobby_app.commands import handle_command, upcoming
 from dobby_app.db import session_scope
@@ -21,6 +22,10 @@ DAILY_PLAN_PROMPT = "What do you plan to accomplish today?"
 
 
 async def handle_message(message: Message, bot: Bot) -> str | None:
+    if _message_already_recorded(message):
+        logger.info("Skipping duplicate Telegram message %s in chat %s", message.message_id, message.chat.id)
+        return None
+
     text = message.text or message.caption or ""
     if message.voice:
         voice_path = await download_voice(message, bot)
@@ -48,6 +53,19 @@ async def handle_message(message: Message, bot: Bot) -> str | None:
     if not text.strip():
         return None
     return await handle_plain_text(text)
+
+
+def _message_already_recorded(message: Message) -> bool:
+    with session_scope() as session:
+        return (
+            session.scalar(
+                select(TelegramMessage.id).where(
+                    TelegramMessage.message_id == message.message_id,
+                    TelegramMessage.chat_id == message.chat.id,
+                )
+            )
+            is not None
+        )
 
 
 async def handle_plain_text(text: str) -> str:
