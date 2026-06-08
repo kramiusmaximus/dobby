@@ -17,6 +17,11 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
 
+    obsidian_api_url: str = "http://127.0.0.1:27123"
+    obsidian_api_key: str = ""
+    obsidian_verify_tls: bool = Field(False, alias="OBSIDIAN_VERIFY_TLS")
+    obsidian_enabled: bool | None = Field(None, alias="OBSIDIAN_ENABLED")
+
     database_url: str = "sqlite:///./dobby.db"
     redis_url: str = "redis://localhost:6379/0"
 
@@ -43,6 +48,19 @@ class Settings(BaseSettings):
         if value == "":
             return 0
         return value
+
+    @field_validator("obsidian_enabled", mode="before")
+    @classmethod
+    def empty_obsidian_enabled_is_auto(cls, value: object) -> object:
+        if value == "":
+            return None
+        return value
+
+    @property
+    def effective_obsidian_enabled(self) -> bool:
+        if self.obsidian_enabled is not None:
+            return self.obsidian_enabled
+        return bool(self.obsidian_api_url and self.obsidian_api_key)
 
 
 settings = Settings()

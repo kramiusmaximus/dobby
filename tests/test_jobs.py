@@ -6,14 +6,19 @@ from datetime import timedelta
 from dobby_app.jobs import _daily_briefing
 
 
-def test_daily_briefing_sends_four_formatted_messages(monkeypatch, tmp_path):
+def test_daily_briefing_sends_four_formatted_messages(monkeypatch):
     sent = []
     captured = {}
-    wiki_root = tmp_path / "wiki"
-    goal = wiki_root / "pages" / "goals" / "gift.md"
-    goal.parent.mkdir(parents=True)
-    goal.write_text(
-        """---
+
+    class FakeObsidianClient:
+        def list(self, path):
+            if path == "pages/goals":
+                return ["gift.md"]
+            return []
+
+        def read(self, path):
+            assert path == "pages/goals/gift.md"
+            return """---
 title: Gift
 type: goal
 created: 2026-06-08
@@ -28,9 +33,7 @@ sources: []
 ## Goal
 
 Buy the present before the birthday.
-""",
-        encoding="utf-8",
-    )
+"""
 
     def fake_list_items(start, end):
         captured["start"] = start
@@ -46,7 +49,8 @@ Buy the present before the birthday.
     monkeypatch.setattr("dobby_app.jobs.random.choice", lambda options: options[0])
     monkeypatch.setattr("dobby_app.jobs.list_items", fake_list_items)
     monkeypatch.setattr("dobby_app.jobs.send_telegram_message", fake_send_telegram_message)
-    monkeypatch.setattr("dobby_app.jobs.settings.wiki_root", wiki_root)
+    monkeypatch.setattr("dobby_app.jobs.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.jobs.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(_daily_briefing())
 

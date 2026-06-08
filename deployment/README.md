@@ -6,6 +6,7 @@ This deployment runs DOBBY as three app services plus PostgreSQL and Redis:
 - `poller`: Telegram long-polling intake loop.
 - `worker`: RQ background worker.
 - `scheduler`: APScheduler process that reads job schedules from PostgreSQL.
+- `obsidian`: LinuxServer Obsidian desktop container with the DOBBY vault mounted at `/config/dobby`.
 - `postgres`: durable runtime state.
 - `redis`: queue backend.
 
@@ -20,21 +21,24 @@ cd /opt/dobby
 cp .env.example .env
 ```
 
-Fill `.env` with Telegram, OpenAI, and iCloud CalDAV credentials. For iCloud, use an app-specific password.
+Fill `.env` with Telegram, OpenAI, Obsidian Local REST API, and iCloud CalDAV credentials. For iCloud, use an app-specific password.
 
 ```bash
+python3 deployment/setup_obsidian_local_rest.py /opt/dobby
 docker compose up -d --build
 curl http://localhost:8000/health
-curl -X POST http://localhost:8000/telegram/set-webhook
 ```
 
-If there is no public HTTPS reverse proxy yet, run Telegram with long polling in a future worker mode or put Caddy/Nginx in front of port `8000`.
+The Obsidian API is served by the Local REST API plugin on localhost HTTP port `27123`. HTTPS mode is disabled because the endpoint is bound only to the VPS loopback interface.
+
+On a brand-new Obsidian profile, open the Obsidian GUI through an SSH tunnel to port `3001` and accept the vault author trust prompt once so community plugins can run. The trust decision is stored under `obsidian-config/`.
 
 ## Data To Preserve
 
 The compose file mounts these folders into the app:
 
 - `wiki/`
+- `obsidian-config/`
 - `assets/`
 - `telegram_bot_cli/voice_messages/`
 - `telegram_bot_cli/media_messages/`
@@ -68,7 +72,7 @@ Reminder and event commands:
 /upcoming
 ```
 
-Reminder and event writes update the Obsidian wiki calendar page first, then write to CalDAV. Treat CalDAV as the notification transport and the mounted `wiki/` vault as DOBBY's source of truth.
+Reminder and event writes update the Obsidian wiki calendar page through Obsidian Local REST API first, then write to CalDAV. Treat CalDAV as the notification transport and Obsidian as DOBBY's source of truth.
 
 Plain text and transcribed voice messages are routed through the lightweight OpenAI router model configured by `ROUTER_MODEL`.
 
@@ -97,4 +101,4 @@ The deploy workflow expects these repository secrets:
 none
 ```
 
-The deploy job runs on the VPS through the `dobby-vps` GitHub self-hosted runner. It preserves `/opt/dobby/.env`, rebuilds the Docker images, runs `docker compose up -d`, and checks `/health`.
+The deploy job runs on the VPS through the `dobby-vps` GitHub self-hosted runner. It preserves `/opt/dobby/.env`, `/opt/dobby/wiki`, and `/opt/dobby/obsidian-config`, configures the Obsidian Local REST API plugin, rebuilds the DOBBY images, runs `docker compose up -d`, and checks `/health`.

@@ -10,11 +10,12 @@ from sqlalchemy import select
 
 from dobby_app.commands import handle_command, upcoming
 from dobby_app.db import session_scope
+from dobby_app.memory_agent import answer_memory_query
 from dobby_app.models import TelegramMessage
 from dobby_app.router import assistant_chat, route_message
 from dobby_app.timeparse import parse_datetime
 from dobby_app.transcription import download_voice, transcribe_audio
-from dobby_app.wiki_memory import save_memory_note
+from dobby_app.wiki_memory import handle_memory_command, save_memory_note
 
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,9 @@ async def handle_message(message: Message, bot: Bot) -> str | None:
         )
 
         if text.startswith("/"):
+            command = text.strip().split(maxsplit=1)[0].lower()
+            if command == "/memory":
+                return await handle_memory_agent_command(text)
             return handle_command(session, text)
 
     if _is_daily_plan_reply(message):
@@ -92,12 +96,25 @@ async def handle_plain_text(text: str) -> str:
         if routed.action == "list_upcoming":
             return upcoming(days=14)
 
-        if routed.action in {"chat", "wiki_query", "daily_briefing"}:
+        if routed.action == "wiki_query":
+            query = args.get("query") or text
+            return await answer_memory_query(query)
+
+        if routed.action in {"chat", "daily_briefing"}:
             return await assistant_chat(text)
     except Exception as exc:
         return f"I could not complete that: {exc}"
 
     return await assistant_chat(text)
+
+
+async def handle_memory_agent_command(text: str) -> str:
+    rest = text[len("/memory") :].strip()
+    action, _, _remainder = rest.partition(" ")
+    if not rest or action.lower() in {"save", "remember"}:
+        return handle_memory_command(rest)
+
+    return await answer_memory_query(rest)
 
 
 def _create_routed_item(

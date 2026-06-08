@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import contextmanager
 from types import SimpleNamespace
 
-from dobby_app.message_handler import _is_daily_plan_reply, _message_already_recorded, _save_daily_plan_response
+from dobby_app.message_handler import (
+    _is_daily_plan_reply,
+    _message_already_recorded,
+    _save_daily_plan_response,
+    handle_memory_agent_command,
+    handle_plain_text,
+)
 from dobby_app.models import TelegramMessage
+from dobby_app.router import RoutedAction
 
 
 def test_daily_plan_reply_is_detected():
@@ -51,3 +59,41 @@ def test_message_already_recorded_detects_duplicate(monkeypatch, sqlite_session)
     sqlite_session.commit()
 
     assert _message_already_recorded(message)
+
+
+def test_memory_command_routes_query_to_agent(monkeypatch):
+    calls = []
+
+    async def fake_answer_memory_query(query):
+        calls.append(query)
+        return "Agent answer"
+
+    monkeypatch.setattr("dobby_app.message_handler.answer_memory_query", fake_answer_memory_query)
+
+    response = asyncio.run(handle_memory_agent_command("/memory TouchDesigner"))
+
+    assert response == "Agent answer"
+    assert calls == ["TouchDesigner"]
+
+
+def test_plain_wiki_query_routes_to_agent(monkeypatch):
+    async def fake_route_message(text):
+        return RoutedAction(
+            action="wiki_query",
+            arguments={"query": "Narjiss"},
+            confidence=0.9,
+        )
+
+    calls = []
+
+    async def fake_answer_memory_query(query):
+        calls.append(query)
+        return "Wiki answer"
+
+    monkeypatch.setattr("dobby_app.message_handler.route_message", fake_route_message)
+    monkeypatch.setattr("dobby_app.message_handler.answer_memory_query", fake_answer_memory_query)
+
+    response = asyncio.run(handle_plain_text("What do you remember about Narjiss?"))
+
+    assert response == "Wiki answer"
+    assert calls == ["Narjiss"]

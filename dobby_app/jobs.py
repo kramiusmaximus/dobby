@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta
-from pathlib import Path
 import random
 import re
 from zoneinfo import ZoneInfo
@@ -13,6 +12,7 @@ from dobby_app.caldav_client import list_items
 from dobby_app.config import settings
 from dobby_app.db import SessionLocal
 from dobby_app.models import JobRun, ScheduledJob
+from dobby_app.obsidian_client import get_obsidian_client, obsidian_is_enabled
 from dobby_app.telegram_client import send_telegram_message
 
 
@@ -127,25 +127,47 @@ def _format_other_reminders_message() -> str:
 
 
 def _memory_reminders() -> list[str]:
-    pages_root = settings.wiki_root / "pages"
+    if not obsidian_is_enabled():
+        return []
+
+    client = get_obsidian_client()
     reminders = []
     for section in ("goals", "projects", "calendar"):
-        for path in sorted((pages_root / section).glob("*.md")):
-            reminders.extend(_page_reminders(path))
+        for path in sorted(_listed_markdown_paths(client.list(f"pages/{section}"), f"pages/{section}")):
+            reminders.extend(_page_reminders(path, client.read(path)))
             if len(reminders) >= 8:
                 return reminders[:8]
     return reminders
 
 
-def _page_reminders(path: Path) -> list[str]:
-    try:
-        content = path.read_text(encoding="utf-8")
-    except OSError:
-        return []
+def _listed_markdown_paths(payload: object, prefix: str) -> list[str]:
+    if isinstance(payload, dict):
+        values = payload.get("files") or payload.get("children") or payload.get("items") or []
+    else:
+        values = payload
+
+    paths = []
+    for item in values if isinstance(values, list) else []:
+        if isinstance(item, str):
+            path = item
+        elif isinstance(item, dict):
+            path = str(item.get("path") or item.get("name") or "")
+        else:
+            continue
+        if not path:
+            continue
+        if "/" not in path:
+            path = f"{prefix.rstrip('/')}/{path}"
+        if path.endswith(".md"):
+            paths.append(path)
+    return paths
+
+
+def _page_reminders(path: str, content: str) -> list[str]:
     if "status: active" not in content:
         return []
 
-    title = _frontmatter_value(content, "title") or path.stem.replace("-", " ").title()
+    title = _frontmatter_value(content, "title") or path.rsplit("/", 1)[-1].removesuffix(".md").replace("-", " ").title()
     lines = content.splitlines()
     collected = []
     capture = False

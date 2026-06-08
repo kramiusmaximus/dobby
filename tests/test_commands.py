@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
 from datetime import datetime
 
 from dobby_app.commands import handle_command
@@ -52,46 +51,40 @@ def test_status_reports_polling(sqlite_session):
     assert "polling every" in response
 
 
-def test_memory_queries_wiki(monkeypatch, tmp_path, sqlite_session):
-    wiki = tmp_path / "wiki"
-    page = wiki / "pages" / "projects" / "studio.md"
-    page.parent.mkdir(parents=True)
-    page.write_text(
-        """---
-title: Studio Project
-type: project
-created: 2026-06-07
-updated: 2026-06-07
-status: active
-tags: []
-sources: []
----
-
-# Studio Project
-
-Mark wants a projection installation with TouchDesigner.
-""",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr("dobby_app.wiki_memory.settings.wiki_root", wiki)
-
+def test_memory_queries_wiki(sqlite_session):
     response = handle_command(sqlite_session, "/memory TouchDesigner")
 
-    assert "Memory matches for: TouchDesigner" in response
-    assert "Studio Project" in response
+    assert response == "Memory queries are handled by DOBBY's Obsidian-backed agent."
 
 
-def test_memory_save_updates_obsidian_wiki(monkeypatch, tmp_path, sqlite_session):
-    wiki = tmp_path / "wiki"
-    monkeypatch.setattr("dobby_app.wiki_memory.settings.wiki_root", wiki)
+def test_memory_save_updates_obsidian_wiki(monkeypatch, sqlite_session):
+    class FakeObsidianClient:
+        def __init__(self):
+            self.calls = []
+
+        def read(self, path):
+            self.calls.append(("read", path))
+            return "existing"
+
+        def patch(self, *args, **kwargs):
+            self.calls.append(("patch", args, kwargs))
+            return ""
+
+        def append(self, *args, **kwargs):
+            self.calls.append(("append", args, kwargs))
+            return ""
+
+    client = FakeObsidianClient()
+    monkeypatch.setattr("dobby_app.wiki_memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.wiki_memory.get_obsidian_client", lambda: client)
 
     response = handle_command(sqlite_session, "/memory save Mark prefers concise Telegram acknowledgements")
 
     assert response == "Saved to memory."
-    inbox = wiki / "pages" / "concepts" / "telegram-memory-inbox.md"
-    assert "Mark prefers concise Telegram acknowledgements" in inbox.read_text(encoding="utf-8")
-    assert f"## [{date.today().isoformat()}] memory | Telegram Memory Inbox" in (wiki / "log.md").read_text(
-        encoding="utf-8"
+    assert any(call[0] == "patch" for call in client.calls)
+    assert any(
+        call[0] == "append" and "Mark prefers concise Telegram acknowledgements" in call[1][1]
+        for call in client.calls
     )
 
 

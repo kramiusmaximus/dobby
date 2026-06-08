@@ -2,7 +2,7 @@
 
 DOBBY is Mark's VPS-hosted personal Telegram assistant and persistent Obsidian-style Markdown memory vault.
 
-The project has been migrated from local/macOS automation toward a long-running Linux service. Telegram is the user interface; the durable center of the system is the `wiki/` vault. Obsidian is DOBBY's source of truth for memory, including reminder and calendar context.
+The project has been migrated from local/macOS automation toward a long-running Linux service. Telegram is the user interface; the durable center of the system is the Obsidian vault. Obsidian is DOBBY's source of truth for memory, including reminder and calendar context.
 
 ## Current Production Shape
 
@@ -12,6 +12,7 @@ DOBBY now runs on the VPS at `/opt/dobby` through Docker Compose:
 - `app`: FastAPI service and health endpoint.
 - `worker`: background job worker.
 - `scheduler`: scheduled job process backed by PostgreSQL.
+- `obsidian`: LinuxServer Obsidian desktop container with the production vault mounted.
 - `postgres`: runtime state for jobs, queue history, Telegram records, and CalDAV item records.
 - `redis`: queue backend.
 
@@ -25,7 +26,7 @@ The previous Obsidian vault has been copied to the VPS at:
 /opt/dobby/wiki
 ```
 
-The deployment workflow now preserves `/opt/dobby/wiki` across releases. This is important because Telegram memory commands can update the vault at runtime.
+The deployment workflow now preserves `/opt/dobby/wiki` across releases. Runtime memory operations should go through Obsidian Local REST API, backed by the synced vault.
 
 Local vault path:
 
@@ -90,11 +91,26 @@ Plain text and voice messages without slash commands are routed through OpenAI u
 
 Every Telegram message should receive either a response, a failure reply with context, or a thumbs-up acknowledgement.
 
+## Obsidian API
+
+DOBBY memory queries and wiki writes use the Obsidian Local REST API plugin:
+
+```env
+OBSIDIAN_API_URL=http://127.0.0.1:27123
+OBSIDIAN_API_KEY=
+OBSIDIAN_VERIFY_TLS=false
+OBSIDIAN_ENABLED=
+```
+
+`OBSIDIAN_ENABLED` can be left empty; DOBBY enables Obsidian automatically when `OBSIDIAN_API_KEY` is configured. Production uses the Local REST API plugin over localhost HTTP on port `27123`; HTTPS mode is intentionally disabled because the API is not exposed publicly.
+
+The `obsidian` Compose service uses `lscr.io/linuxserver/obsidian:latest`, mounts the vault at `/config/dobby`, and persists the Obsidian desktop profile in `obsidian-config/`. `deployment/setup_obsidian_local_rest.py` installs/configures the plugin from the deployment host without committing plugin files or API keys.
+
 ## Calendar
 
 DOBBY uses Obsidian as the source of truth for calendar and reminder context. iCloud Calendar over CalDAV is the production delivery and notification transport.
 
-Reminder and event requests sync the relevant Obsidian wiki calendar page before writing to CalDAV.
+Reminder and event requests sync the relevant Obsidian wiki calendar page through the Obsidian API before writing to CalDAV.
 
 Current VPS configuration:
 
@@ -116,6 +132,7 @@ Deployment runs on the VPS self-hosted runner labeled `dobby-vps`. The deploy wo
 
 - `/opt/dobby/.env`
 - `/opt/dobby/wiki`
+- `/opt/dobby/obsidian-config`
 
 See `deployment/README.md` for server setup and operational details.
 

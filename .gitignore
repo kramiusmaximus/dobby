@@ -14,5 +14,6 @@ tmp/
 *.log
 
 storage/
+obsidian-config/
 wiki/.stfolder/
 wiki/.obsidian/

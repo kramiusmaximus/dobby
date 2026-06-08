@@ -1,9 +1,29 @@
 services:
+  obsidian:
+    image: lscr.io/linuxserver/obsidian:latest
+    restart: unless-stopped
+    environment:
+      PUID: "0"
+      PGID: "0"
+      TZ: ${APP_TIMEZONE:-Europe/Moscow}
+      CUSTOM_USER: ${OBSIDIAN_GUI_USER:-mark}
+      PASSWORD: ${OBSIDIAN_GUI_PASSWORD:-dobby-local-only}
+      PIXELFLUX_WAYLAND: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:27123:27123"
+    volumes:
+      - ./obsidian-config:/config
+      - ./wiki:/config/dobby
+    shm_size: "1gb"
+
   app:
     build: .
     command: uvicorn dobby_app.main:app --host 0.0.0.0 --port 8000
     env_file: .env
     depends_on:
+      - obsidian
       - postgres
       - redis
     ports:
@@ -20,6 +40,7 @@ services:
     command: python -m dobby_app.worker
     env_file: .env
     depends_on:
+      - obsidian
       - postgres
       - redis
     volumes:
@@ -34,6 +55,7 @@ services:
     command: python -m dobby_app.poller
     env_file: .env
     depends_on:
+      - obsidian
       - postgres
       - redis
     volumes:
@@ -48,6 +70,7 @@ services:
     command: python -m dobby_app.scheduler
     env_file: .env
     depends_on:
+      - obsidian
       - postgres
       - redis
     volumes:

@@ -44,7 +44,7 @@ jobs:
             --exclude='*.egg-info' \
             -czf /tmp/dobby-release.tgz .
 
-          find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name .env ! -name wiki -exec rm -rf {} +
+          find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name .env ! -name wiki ! -name obsidian-config -exec rm -rf {} +
           tar -xzf /tmp/dobby-release.tgz -C "$DEPLOY_PATH"
 
           if [ ! -d "$DEPLOY_PATH/wiki" ] && [ -d wiki ]; then
@@ -58,7 +58,9 @@ jobs:
           fi
 
           cd "$DEPLOY_PATH"
+          python3 deployment/setup_obsidian_local_rest.py "$DEPLOY_PATH"
           docker compose build app worker scheduler poller
+          docker compose up -d obsidian
           docker compose up -d --force-recreate app worker scheduler poller
           for attempt in {1..30}; do
             if curl -fsS http://localhost:8000/health; then
