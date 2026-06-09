@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from dobby_app.message_handler import (
     _is_daily_plan_reply,
     _message_already_recorded,
+    _recent_conversation_context,
     _save_daily_plan_response,
     handle_memory_agent_command,
     handle_plain_text,
@@ -77,7 +78,7 @@ def test_memory_command_routes_query_to_agent(monkeypatch):
 
 
 def test_plain_wiki_query_routes_to_agent(monkeypatch):
-    async def fake_route_message(text):
+    async def fake_route_message(text, conversation_context=None):
         return RoutedAction(
             action="wiki_query",
             arguments={"query": "Narjiss"},
@@ -97,3 +98,63 @@ def test_plain_wiki_query_routes_to_agent(monkeypatch):
 
     assert response == "Wiki answer"
     assert calls == ["Narjiss"]
+
+
+def test_recent_conversation_context_uses_latest_messages_in_order(monkeypatch, sqlite_session):
+    monkeypatch.setattr("dobby_app.message_handler.settings.telegram_context_message_count", 3)
+    for index in range(5):
+        sqlite_session.add(
+            TelegramMessage(
+                update_id=None,
+                message_id=100 + index,
+                chat_id=1106380883,
+                sender_id=1106380883,
+                text=f"user {index}",
+                kind="text",
+                raw={},
+            )
+        )
+    sqlite_session.add(
+        TelegramMessage(
+            update_id=None,
+            message_id=200,
+            chat_id=1106380883,
+            sender_id=0,
+            text="assistant reply",
+            kind="assistant",
+            raw={},
+        )
+    )
+    sqlite_session.commit()
+
+    context = _recent_conversation_context(sqlite_session, 1106380883)
+
+    assert context == [
+        {"role": "user", "content": "user 3"},
+        {"role": "user", "content": "user 4"},
+        {"role": "assistant", "content": "assistant reply"},
+    ]
+
+
+def test_plain_text_passes_conversation_context_to_router_and_chat(monkeypatch):
+    context = [{"role": "user", "content": "Earlier context"}]
+    calls = []
+
+    async def fake_route_message(text, conversation_context=None):
+        calls.append(("route", text, conversation_context))
+        return RoutedAction(action="chat", arguments={}, confidence=0.9)
+
+    async def fake_assistant_chat(text, conversation_context=None):
+        calls.append(("chat", text, conversation_context))
+        return "Assistant answer"
+
+    monkeypatch.setattr("dobby_app.message_handler.route_message", fake_route_message)
+    monkeypatch.setattr("dobby_app.message_handler.assistant_chat", fake_assistant_chat)
+
+    response = asyncio.run(handle_plain_text("Latest message", context))
+
+    assert response == "Assistant answer"
+    assert calls == [
+        ("route", "Latest message", context),
+        ("chat", "Latest message", context),
+    ]

@@ -7,6 +7,8 @@ from openai import AsyncOpenAI
 
 from dobby_app.config import settings
 
+ConversationMessage = dict[str, str]
+
 
 @dataclass(frozen=True)
 class RoutedAction:
@@ -56,7 +58,20 @@ ROUTER_SCHEMA = {
 }
 
 
-async def route_message(text: str) -> RoutedAction:
+def _llm_input(
+    system_prompt: str,
+    text: str,
+    conversation_context: list[ConversationMessage] | None,
+) -> list[ConversationMessage]:
+    messages: list[ConversationMessage] = [{"role": "system", "content": system_prompt}]
+    if conversation_context:
+        messages.extend(conversation_context)
+    else:
+        messages.append({"role": "user", "content": text})
+    return messages
+
+
+async def route_message(text: str, conversation_context: list[ConversationMessage] | None = None) -> RoutedAction:
     if not settings.openai_api_key:
         return RoutedAction(
             action="chat",
@@ -68,17 +83,16 @@ async def route_message(text: str) -> RoutedAction:
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.responses.create(
         model=settings.router_model,
-        input=[
-            {
-                "role": "system",
-                "content": (
-                    "You route Mark's Telegram message to one DOBBY tool. "
-                    "Use calendar reminders for reminders: a timed calendar event with an alarm. "
-                    "If date/time or title is missing for event/reminder creation, choose clarify."
-                ),
-            },
-            {"role": "user", "content": text},
-        ],
+        input=_llm_input(
+            (
+                "You route Mark's Telegram message to one DOBBY tool. "
+                "Use calendar reminders for reminders: a timed calendar event with an alarm. "
+                "If date/time or title is missing for event/reminder creation, choose clarify. "
+                "Use the conversation context only to interpret the latest user message."
+            ),
+            text,
+            conversation_context,
+        ),
         text={"format": ROUTER_SCHEMA},
     )
     payload = json.loads(response.output_text)
@@ -90,19 +104,17 @@ async def route_message(text: str) -> RoutedAction:
     )
 
 
-async def assistant_chat(text: str) -> str:
+async def assistant_chat(text: str, conversation_context: list[ConversationMessage] | None = None) -> str:
     if not settings.openai_api_key:
         return "I can route commands, but OPENAI_API_KEY is not configured yet."
 
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.responses.create(
         model=settings.assistant_model,
-        input=[
-            {
-                "role": "system",
-                "content": "You are DOBBY, Mark's personal assistant. Be concise and useful in Telegram.",
-            },
-            {"role": "user", "content": text},
-        ],
+        input=_llm_input(
+            "You are DOBBY, Mark's personal assistant. Be concise and useful in Telegram.",
+            text,
+            conversation_context,
+        ),
     )
     return response.output_text.strip()

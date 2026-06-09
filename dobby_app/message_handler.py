@@ -9,6 +9,7 @@ from aiogram.types import ReactionTypeEmoji
 from sqlalchemy import select
 
 from dobby_app.commands import handle_command, upcoming
+from dobby_app.config import settings
 from dobby_app.db import session_scope
 from dobby_app.memory_agent import answer_memory_query
 from dobby_app.models import TelegramMessage
@@ -32,6 +33,7 @@ async def handle_message(message: Message, bot: Bot) -> str | None:
         voice_path = await download_voice(message, bot)
         text = await transcribe_audio(voice_path)
 
+    conversation_context = None
     with session_scope() as session:
         session.add(
             TelegramMessage(
@@ -44,6 +46,7 @@ async def handle_message(message: Message, bot: Bot) -> str | None:
                 raw=message.model_dump(mode="json"),
             )
         )
+        session.flush()
 
         if text.startswith("/"):
             command = text.strip().split(maxsplit=1)[0].lower()
@@ -51,12 +54,14 @@ async def handle_message(message: Message, bot: Bot) -> str | None:
                 return await handle_memory_agent_command(text)
             return handle_command(session, text)
 
+        conversation_context = _recent_conversation_context(session, message.chat.id)
+
     if _is_daily_plan_reply(message):
         return _save_daily_plan_response(text)
 
     if not text.strip():
         return None
-    return await handle_plain_text(text)
+    return await handle_plain_text(text, conversation_context)
 
 
 def _message_already_recorded(message: Message) -> bool:
@@ -72,8 +77,45 @@ def _message_already_recorded(message: Message) -> bool:
         )
 
 
-async def handle_plain_text(text: str) -> str:
-    routed = await route_message(text)
+def _recent_conversation_context(session, chat_id: int) -> list[dict[str, str]]:
+    limit = max(settings.telegram_context_message_count, 1)
+    rows = (
+        session.execute(
+            select(TelegramMessage)
+            .where(TelegramMessage.chat_id == chat_id, TelegramMessage.text.is_not(None))
+            .order_by(TelegramMessage.id.desc())
+            .limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    messages: list[dict[str, str]] = []
+    for row in reversed(rows):
+        content = (row.text or "").strip()
+        if not content:
+            continue
+        role = "assistant" if row.kind == "assistant" else "user"
+        messages.append({"role": role, "content": content})
+    return messages
+
+
+def _record_assistant_message(message: Message, sent_message: Message, text: str) -> None:
+    with session_scope() as session:
+        session.add(
+            TelegramMessage(
+                update_id=None,
+                message_id=sent_message.message_id,
+                chat_id=message.chat.id,
+                sender_id=sent_message.from_user.id if sent_message.from_user else 0,
+                text=text,
+                kind="assistant",
+                raw=sent_message.model_dump(mode="json"),
+            )
+        )
+
+
+async def handle_plain_text(text: str, conversation_context: list[dict[str, str]] | None = None) -> str:
+    routed = await route_message(text, conversation_context)
     if routed.action == "clarify" or routed.confidence < 0.45:
         return routed.clarification or "I need one more detail before I do that."
 
@@ -101,11 +143,11 @@ async def handle_plain_text(text: str) -> str:
             return await answer_memory_query(query)
 
         if routed.action in {"chat", "daily_briefing"}:
-            return await assistant_chat(text)
+            return await assistant_chat(text, conversation_context)
     except Exception as exc:
         return f"I could not complete that: {exc}"
 
-    return await assistant_chat(text)
+    return await assistant_chat(text, conversation_context)
 
 
 async def handle_memory_agent_command(text: str) -> str:
@@ -178,12 +220,13 @@ async def reply_to_message(bot: Bot, message: Message) -> None:
         return
 
     if response and response.strip():
-        await bot.send_message(
+        sent_message = await bot.send_message(
             message.chat.id,
             response,
             disable_web_page_preview=True,
             reply_to_message_id=message.message_id,
         )
+        _record_assistant_message(message, sent_message, response)
         return
 
     await acknowledge_message(bot, message)
