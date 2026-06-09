@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytest
 
+from dobby_app.obsidian_client import ObsidianHTTPError
 from dobby_app.wiki_memory import delete_wiki_line, sync_calendar_item_to_wiki, update_wiki_line
 
 
@@ -103,6 +104,40 @@ def test_delete_wiki_line_removes_one_exact_line(monkeypatch):
             return ""
 
         def append(self, *args, **kwargs):
+            return ""
+
+    client = FakeObsidianClient()
+    monkeypatch.setattr("dobby_app.wiki_memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.wiki_memory.get_obsidian_client", lambda: client)
+
+    response = delete_wiki_line(
+        path="pages/goals/example.md",
+        exact_line="- Remove",
+        reason="test",
+    )
+
+    assert response == "Deleted wiki line from pages/goals/example.md."
+    assert client.content == "# Note\n\n- Keep\n"
+
+
+def test_delete_wiki_line_succeeds_when_log_append_404s(monkeypatch):
+    class FakeObsidianClient:
+        def __init__(self):
+            self.content = "# Note\n\n- Keep\n- Remove\n"
+
+        def read(self, path):
+            return self.content if path == "pages/goals/example.md" else "# Log\n"
+
+        def write(self, path, content):
+            self.content = content
+            return ""
+
+        def patch(self, *args, **kwargs):
+            return ""
+
+        def append(self, path, content, **kwargs):
+            if path == "log.md":
+                raise ObsidianHTTPError("not found", status_code=404)
             return ""
 
     client = FakeObsidianClient()

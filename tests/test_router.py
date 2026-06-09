@@ -9,12 +9,23 @@ def test_planner_context_mentions_durable_daily_and_weekly_plans():
 
     assert "Daily plans, weekly plans" in prompt
     assert 'A reply to "What do you plan to accomplish today?" is a daily plan' in prompt
-    assert "wiki.create" in prompt
+    assert "Preserve these unless Mark is clearly only chatting" in prompt
+
+
+def test_planner_context_does_not_document_executor_operations():
+    prompt = _planner_system_prompt()
+
+    assert "wiki.create" not in prompt
+    assert "wiki.update" not in prompt
+    assert "calendar.create" not in prompt
+    assert "message.send" not in prompt
 
 
 def test_executor_context_documents_safe_wiki_mutations():
     context = load_context_template("executor.md")
 
     assert "Do not perform arbitrary wiki rewrites." in context
-    assert "wiki.update` requires" in context
-    assert "wiki.delete` requires" in context
+    assert "`wiki.update` replaces one exact line" in context
+    assert "`wiki.delete` deletes one exact line" in context
+    assert "calendar.create" in context
+    assert "message.send" in context

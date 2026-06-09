@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 
 from dobby_app.obsidian_client import ObsidianHTTPError, get_obsidian_client, obsidian_is_enabled
 
 
+logger = logging.getLogger(__name__)
 MEMORY_INBOX = "pages/concepts/telegram-memory-inbox.md"
 LOG_PAGE = "log.md"
 MONTH_NAMES = {
@@ -62,7 +64,7 @@ def update_wiki_line(*, path: str, exact_line: str, replacement: str, reason: st
     updated = _replace_exact_line(content, exact_line, replacement)
     client.write(path, updated)
     _try_patch_frontmatter(path, "updated", today)
-    _append_wiki_log(
+    _try_append_wiki_log(
         "\n".join(
             [
                 f"\n## [{today}] memory-update | {path}",
@@ -89,7 +91,7 @@ def delete_wiki_line(*, path: str, exact_line: str, reason: str | None = None) -
     updated = _delete_exact_line(content, exact_line)
     client.write(path, updated)
     _try_patch_frontmatter(path, "updated", today)
-    _append_wiki_log(
+    _try_append_wiki_log(
         "\n".join(
             [
                 f"\n## [{today}] memory-delete | {path}",
@@ -166,7 +168,7 @@ def _sync_calendar_marker_to_wiki(
             f"- Scheduled time: {timestamp}\n"
             f"- Type: {item_type}\n"
         )
-        _append_wiki_log(entry)
+        _try_append_wiki_log(entry)
 
     return rel_path
 
@@ -248,8 +250,9 @@ def _obsidian_patch_frontmatter(path: str, key: str, value: str) -> None:
 def _try_patch_frontmatter(path: str, key: str, value: str) -> None:
     try:
         _obsidian_patch_frontmatter(path, key, value)
-    except ObsidianHTTPError:
+    except ObsidianHTTPError as exc:
         # Some ad hoc notes may not have frontmatter yet. The line mutation already succeeded.
+        logger.warning("Could not patch Obsidian frontmatter for %s: %s", path, exc)
         return
 
 
@@ -312,6 +315,14 @@ def _append_wiki_log(entry: str) -> None:
             ),
         )
     client.append(LOG_PAGE, entry.rstrip() + "\n")
+
+
+def _try_append_wiki_log(entry: str) -> None:
+    try:
+        _append_wiki_log(entry)
+    except ObsidianHTTPError as exc:
+        # Audit logging should not turn an already-applied wiki mutation into a user-visible failure.
+        logger.warning("Could not append Obsidian wiki log entry: %s", exc)
 
 
 def _coerce_datetime(value: object) -> datetime | None:
