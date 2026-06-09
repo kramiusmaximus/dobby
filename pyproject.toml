@@ -44,4 +44,4 @@ testpaths = ["tests"]
 include = ["dobby_app*"]
 
 [tool.setuptools.package-data]
-dobby_app = ["context/*.md"]
+dobby_app = ["context/*.md", "context/tools/*.md"]

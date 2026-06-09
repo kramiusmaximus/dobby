@@ -21,11 +21,13 @@ def test_planner_context_does_not_document_executor_operations():
     assert "message.send" not in prompt
 
 
-def test_executor_context_documents_safe_wiki_mutations():
-    context = load_context_template("executor.md")
+def test_tool_contexts_document_executor_operations():
+    message_context = load_context_template("tools/message.md")
+    calendar_context = load_context_template("tools/calendar.md")
+    wiki_context = load_context_template("tools/wiki.md")
 
-    assert "Do not perform arbitrary wiki rewrites." in context
-    assert "`wiki.update` replaces one exact line" in context
-    assert "`wiki.delete` deletes one exact line" in context
-    assert "calendar.create" in context
-    assert "message.send" in context
+    assert "Supported operation" in message_context
+    assert "Supported operations" in calendar_context
+    assert "Supported operations" in wiki_context
+    assert "Do not perform arbitrary wiki rewrites." in wiki_context
+    assert "`exact_line`" in wiki_context

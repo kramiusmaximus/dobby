@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from openai import AsyncOpenAI
@@ -94,16 +95,33 @@ def _llm_input(
     system_prompt: str,
     text: str,
     conversation_context: list[ConversationMessage] | None,
+    tool_results: list[dict[str, Any]] | None = None,
 ) -> list[ConversationMessage]:
     messages: list[ConversationMessage] = [{"role": "system", "content": system_prompt}]
     if conversation_context:
         messages.extend(conversation_context)
     else:
         messages.append({"role": "user", "content": text})
+    if tool_results:
+        messages.append(
+            {
+                "role": "user",
+                "content": (
+                    "Tool executor results from the previous plan:\n"
+                    f"{json.dumps(tool_results, ensure_ascii=False, default=str)}\n\n"
+                    "Decide the next plan. If enough work is complete, respond to Mark. "
+                    "If something is not found or ambiguous, ask a concise clarification."
+                ),
+            }
+        )
     return messages
 
 
-async def plan_actions(text: str, conversation_context: list[ConversationMessage] | None = None) -> ActionPlan:
+async def plan_actions(
+    text: str,
+    conversation_context: list[ConversationMessage] | None = None,
+    tool_results: list[dict[str, Any]] | None = None,
+) -> ActionPlan:
     if not settings.openai_api_key:
         return ActionPlan(
             actions=[
@@ -123,6 +141,7 @@ async def plan_actions(text: str, conversation_context: list[ConversationMessage
             _planner_system_prompt(),
             text,
             conversation_context,
+            tool_results,
         ),
         text={"format": ACTION_PLAN_SCHEMA},
     )

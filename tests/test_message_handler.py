@@ -58,14 +58,24 @@ def test_memory_command_routes_query_to_agent(monkeypatch):
 
 
 def test_plain_wiki_query_routes_to_agent(monkeypatch):
-    async def fake_plan_actions(text, conversation_context=None):
+    plan_calls = []
+
+    async def fake_plan_actions(text, conversation_context=None, tool_results=None):
+        plan_calls.append(tool_results)
+        if tool_results:
+            return ActionPlan(
+                actions=[
+                    PlannedAction(
+                        tool="message",
+                        operation="send",
+                        arguments={"content": "Wiki answer"},
+                    )
+                ],
+                confidence=0.9,
+            )
         return ActionPlan(
             actions=[
-                PlannedAction(
-                    tool="wiki",
-                    operation="read",
-                    arguments={"query": "Narjiss"},
-                )
+                PlannedAction(tool="wiki", operation="read", arguments={"query": "Narjiss"})
             ],
             confidence=0.9,
         )
@@ -77,16 +87,18 @@ def test_plain_wiki_query_routes_to_agent(monkeypatch):
         return "Wiki answer"
 
     monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
-    monkeypatch.setattr("dobby_app.message_handler.answer_memory_query", fake_answer_memory_query)
+    monkeypatch.setattr("dobby_app.tool_executors.answer_memory_query", fake_answer_memory_query)
 
     response = asyncio.run(handle_plain_text("What do you remember about Narjiss?"))
 
     assert response == "Wiki answer"
     assert calls == ["Narjiss"]
+    assert plan_calls[1][0]["tool"] == "wiki"
+    assert plan_calls[1][0]["message"] == "Wiki answer"
 
 
 def test_plain_wiki_update_executes_safe_line_update(monkeypatch):
-    async def fake_plan_actions(text, conversation_context=None):
+    async def fake_plan_actions(text, conversation_context=None, tool_results=None):
         return ActionPlan(
             actions=[
                 PlannedAction(
@@ -115,12 +127,11 @@ def test_plain_wiki_update_executes_safe_line_update(monkeypatch):
         return "Updated wiki line in pages/goals/mother-birthday-gift.md."
 
     monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
-    monkeypatch.setattr("dobby_app.message_handler.update_wiki_line", fake_update_wiki_line)
+    monkeypatch.setattr("dobby_app.tool_executors.update_wiki_line", fake_update_wiki_line)
 
     response = asyncio.run(handle_plain_text("remove one"))
 
-    assert "Updated wiki line" in response
-    assert "Removed the duplicate." in response
+    assert response == "Removed the duplicate."
     assert calls == [
         {
             "path": "pages/goals/mother-birthday-gift.md",
@@ -132,7 +143,18 @@ def test_plain_wiki_update_executes_safe_line_update(monkeypatch):
 
 
 def test_plain_wiki_delete_requires_exact_line(monkeypatch):
-    async def fake_plan_actions(text, conversation_context=None):
+    async def fake_plan_actions(text, conversation_context=None, tool_results=None):
+        if tool_results:
+            return ActionPlan(
+                actions=[
+                    PlannedAction(
+                        tool="message",
+                        operation="send",
+                        arguments={"content": tool_results[-1]["message"]},
+                    )
+                ],
+                confidence=0.9,
+            )
         return ActionPlan(
             actions=[
                 PlannedAction(
@@ -217,7 +239,7 @@ def test_handle_message_stores_reply_metadata_and_passes_context(monkeypatch, sq
 
     calls = []
 
-    async def fake_plan_actions(text, conversation_context=None):
+    async def fake_plan_actions(text, conversation_context=None, tool_results=None):
         calls.append((text, conversation_context))
         return ActionPlan(
             actions=[
@@ -276,7 +298,7 @@ def test_plain_text_passes_conversation_context_to_router_and_chat(monkeypatch):
     context = [{"role": "user", "content": "Earlier context"}]
     calls = []
 
-    async def fake_plan_actions(text, conversation_context=None):
+    async def fake_plan_actions(text, conversation_context=None, tool_results=None):
         calls.append(("plan", text, conversation_context))
         return ActionPlan(
             actions=[

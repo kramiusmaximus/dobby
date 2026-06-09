@@ -8,20 +8,19 @@ from aiogram.types import Message
 from aiogram.types import ReactionTypeEmoji
 from sqlalchemy import select
 
-from dobby_app.commands import handle_command, upcoming
+from dobby_app.commands import handle_command
 from dobby_app.config import settings
-from dobby_app.context_templates import load_context_template
 from dobby_app.db import session_scope
 from dobby_app.memory_agent import answer_memory_query
 from dobby_app.models import TelegramMessage
-from dobby_app.router import ActionPlan, PlannedAction, assistant_chat, plan_actions
-from dobby_app.timeparse import parse_datetime
+from dobby_app.router import ActionPlan, assistant_chat, plan_actions
+from dobby_app.tool_executors import ToolExecutionResult, execute_tool_action
 from dobby_app.transcription import download_voice, transcribe_audio
-from dobby_app.wiki_memory import delete_wiki_line, handle_memory_command, save_memory_note, update_wiki_line
+from dobby_app.wiki_memory import handle_memory_command
 
 
 logger = logging.getLogger(__name__)
-EXECUTOR_CONTEXT = load_context_template("executor.md")
+MAX_PLANNER_TOOL_ROUNDS = 3
 
 
 async def handle_message(message: Message, bot: Bot) -> str | None:
@@ -160,91 +159,67 @@ async def execute_action_plan(
     text: str,
     conversation_context: list[dict[str, str]] | None = None,
 ) -> str:
-    outputs: list[str] = []
-    for action in plan.actions:
-        try:
-            result = await _execute_action(action, text, conversation_context)
-        except Exception as exc:
-            result = f"I could not complete that: {exc}"
-        if result and result.strip():
-            outputs.append(result.strip())
+    current_plan = plan
+    all_results: list[ToolExecutionResult] = []
+    for _round in range(MAX_PLANNER_TOOL_ROUNDS):
+        results = await _execute_plan_once(current_plan, text)
+        all_results.extend(results)
+        message_outputs = [
+            result.message
+            for result in results
+            if result.tool == "message" and result.status == "success" and result.message
+        ]
+        if message_outputs:
+            return "\n\n".join(message_outputs)
 
-    if outputs:
-        return "\n\n".join(outputs)
+        if not _planner_should_continue(results):
+            non_message_outputs = [
+                result.message for result in results if result.message and result.status != "success"
+            ]
+            if non_message_outputs:
+                return "\n\n".join(non_message_outputs)
+            break
+
+        current_plan = await plan_actions(
+            text,
+            conversation_context,
+            tool_results=[_result_payload(result) for result in all_results],
+        )
+
     return await assistant_chat(text, conversation_context)
 
 
-async def _execute_action(
-    action: PlannedAction,
-    text: str,
-    conversation_context: list[dict[str, str]] | None,
-) -> str | None:
-    args = action.arguments
-    if action.tool == "message":
-        return args.get("content") or args.get("query") or args.get("title")
-
-    if action.tool == "calendar":
-        operation = action.operation or "read"
-        if operation == "read":
-            return upcoming(days=int(args.get("days") or 14))
-        if operation == "create":
-            title = args.get("title") or args.get("query")
-            when = args.get("datetime")
-            kind = args.get("kind") or "event"
-            if not title or not when:
-                return _missing_argument_message("Calendar writes require a title and datetime.")
-            item_type = "reminder" if kind == "reminder" else "event"
-            alarm = args.get("alarm_minutes_before")
-            if item_type == "reminder" and alarm is None:
-                alarm = 0
-            return _create_routed_item(title, when, item_type, alarm)
-        return "Calendar update/delete is not implemented yet."
-
-    if action.tool == "wiki":
-        operation = action.operation or "read"
-        if operation == "read":
-            return await answer_memory_query(args.get("query") or text)
-        if operation == "create":
-            content = args.get("content") or args.get("query") or text
-            save_memory_note(content)
-            return None
-        if operation == "update":
-            path = args.get("path")
-            exact_line = args.get("exact_line")
-            replacement = args.get("replacement")
-            if replacement is None:
-                replacement = args.get("content")
-            if not path or not exact_line or replacement is None:
-                return _missing_argument_message(
-                    "wiki.update requires a path, exact_line, and replacement."
+async def _execute_plan_once(plan: ActionPlan, text: str) -> list[ToolExecutionResult]:
+    results = []
+    for action in plan.actions:
+        try:
+            results.append(await execute_tool_action(action, text))
+        except Exception as exc:
+            results.append(
+                ToolExecutionResult(
+                    tool=action.tool,
+                    operation=action.operation,
+                    status="failed",
+                    message=f"I could not complete that: {exc}",
                 )
-            return update_wiki_line(
-                path=path,
-                exact_line=exact_line,
-                replacement=replacement,
-                reason=action.reason,
             )
-        if operation == "delete":
-            path = args.get("path")
-            exact_line = args.get("exact_line")
-            if not path or not exact_line:
-                return _missing_argument_message("wiki.delete requires a path and exact_line.")
-            return delete_wiki_line(path=path, exact_line=exact_line, reason=action.reason)
-        return "Wiki operation is not implemented yet."
-
-    return None
+    return results
 
 
-def _missing_argument_message(policy_line: str) -> str:
-    if policy_line not in EXECUTOR_CONTEXT:
-        logger.warning("Executor policy line is not documented in context template: %s", policy_line)
-    if policy_line.startswith("Calendar"):
-        return "What should I put on the calendar, and when?"
-    if "update" in policy_line:
-        return "Which exact wiki line should I update?"
-    if "delete" in policy_line:
-        return "Which exact wiki line should I delete?"
-    return "I need one more detail before I do that."
+def _planner_should_continue(results: list[ToolExecutionResult]) -> bool:
+    if any(result.tool == "message" and result.status == "success" for result in results):
+        return False
+    return any(result.tool != "message" for result in results)
+
+
+def _result_payload(result: ToolExecutionResult) -> dict:
+    return {
+        "tool": result.tool,
+        "operation": result.operation,
+        "status": result.status,
+        "message": result.message,
+        "data": result.data,
+    }
 
 
 async def handle_memory_agent_command(text: str) -> str:
@@ -254,37 +229,6 @@ async def handle_memory_agent_command(text: str) -> str:
         return handle_memory_command(rest)
 
     return await answer_memory_query(rest)
-
-
-def _create_routed_item(
-    title: str,
-    when: str,
-    item_type: str,
-    alarm_minutes_before: int | None,
-) -> str:
-    from dobby_app.caldav_client import create_calendar_item
-    from dobby_app.models import CaldavItem
-
-    starts_at = parse_datetime(when)
-    with session_scope() as session:
-        result = create_calendar_item(
-            title=title,
-            starts_at=starts_at,
-            item_type=item_type,
-            alarm_minutes_before=alarm_minutes_before,
-        )
-        session.add(
-            CaldavItem(
-                uid=result.uid,
-                calendar_url=result.url,
-                title=title,
-                item_type=item_type,
-                starts_at=starts_at,
-                ends_at=starts_at,
-                alarm_minutes_before=alarm_minutes_before,
-            )
-        )
-    return f"Created {item_type}: {title} at {starts_at}."
 
 
 async def reply_to_message(bot: Bot, message: Message) -> None:
