@@ -18,6 +18,9 @@ class TelegramMessage(Base):
     sender_id: Mapped[int] = mapped_column(Integer, index=True)
     text: Mapped[str | None] = mapped_column(Text)
     kind: Mapped[str] = mapped_column(String(32), default="text")
+    reply_to_message_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    reply_to_text: Mapped[str | None] = mapped_column(Text)
+    reply_to_kind: Mapped[str | None] = mapped_column(String(32))
     raw: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 

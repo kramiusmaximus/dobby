@@ -50,6 +50,59 @@ def save_memory_note(note: str) -> None:
     _append_wiki_log(f"\n## [{today}] memory | Telegram Memory Inbox\n\n- Saved memory note: {note}\n")
 
 
+def update_wiki_line(*, path: str, exact_line: str, replacement: str, reason: str | None = None) -> str:
+    if not obsidian_is_enabled():
+        raise RuntimeError("Obsidian API is not configured; memory writes are unavailable.")
+    if not path.strip() or not exact_line.strip():
+        raise ValueError("Wiki update requires a path and exact_line.")
+
+    today = date.today().isoformat()
+    client = get_obsidian_client()
+    content = client.read(path)
+    updated = _replace_exact_line(content, exact_line, replacement)
+    client.write(path, updated)
+    _try_patch_frontmatter(path, "updated", today)
+    _append_wiki_log(
+        "\n".join(
+            [
+                f"\n## [{today}] memory-update | {path}",
+                "",
+                f"- Replaced exact line: {exact_line}",
+                f"- Replacement: {replacement}",
+                f"- Reason: {reason or 'not specified'}",
+                "",
+            ]
+        )
+    )
+    return f"Updated wiki line in {path}."
+
+
+def delete_wiki_line(*, path: str, exact_line: str, reason: str | None = None) -> str:
+    if not obsidian_is_enabled():
+        raise RuntimeError("Obsidian API is not configured; memory writes are unavailable.")
+    if not path.strip() or not exact_line.strip():
+        raise ValueError("Wiki delete requires a path and exact_line.")
+
+    today = date.today().isoformat()
+    client = get_obsidian_client()
+    content = client.read(path)
+    updated = _delete_exact_line(content, exact_line)
+    client.write(path, updated)
+    _try_patch_frontmatter(path, "updated", today)
+    _append_wiki_log(
+        "\n".join(
+            [
+                f"\n## [{today}] memory-delete | {path}",
+                "",
+                f"- Deleted exact line: {exact_line}",
+                f"- Reason: {reason or 'not specified'}",
+                "",
+            ]
+        )
+    )
+    return f"Deleted wiki line from {path}."
+
+
 def sync_calendar_item_to_wiki(*, title: str, starts_at: datetime, item_type: str) -> str:
     return _sync_calendar_marker_to_wiki(
         title=title,
@@ -190,6 +243,45 @@ def _obsidian_patch_frontmatter(path: str, key: str, value: str) -> None:
         target=key,
         content_type="application/json",
     )
+
+
+def _try_patch_frontmatter(path: str, key: str, value: str) -> None:
+    try:
+        _obsidian_patch_frontmatter(path, key, value)
+    except ObsidianHTTPError:
+        # Some ad hoc notes may not have frontmatter yet. The line mutation already succeeded.
+        return
+
+
+def _replace_exact_line(content: str, exact_line: str, replacement: str) -> str:
+    lines = content.splitlines(keepends=True)
+    matches = [index for index, line in enumerate(lines) if line.rstrip("\r\n") == exact_line]
+    if not matches:
+        raise ValueError("Exact line was not found in the wiki page.")
+    if len(matches) > 1:
+        raise ValueError("Exact line appears more than once; refusing ambiguous wiki update.")
+    newline = _line_ending(lines[matches[0]])
+    lines[matches[0]] = replacement + newline
+    return "".join(lines)
+
+
+def _delete_exact_line(content: str, exact_line: str) -> str:
+    lines = content.splitlines(keepends=True)
+    matches = [index for index, line in enumerate(lines) if line.rstrip("\r\n") == exact_line]
+    if not matches:
+        raise ValueError("Exact line was not found in the wiki page.")
+    if len(matches) > 1:
+        raise ValueError("Exact line appears more than once; refusing ambiguous wiki delete.")
+    del lines[matches[0]]
+    return "".join(lines)
+
+
+def _line_ending(line: str) -> str:
+    if line.endswith("\r\n"):
+        return "\r\n"
+    if line.endswith("\n"):
+        return "\n"
+    return ""
 
 
 def _append_wiki_log(entry: str) -> None:

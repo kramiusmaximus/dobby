@@ -31,8 +31,7 @@ services:
     volumes:
       - ./wiki:/app/wiki
       - ./assets:/app/assets
-      - ./telegram_bot_cli/voice_messages:/app/storage/media/voice_messages
-      - ./telegram_bot_cli/media_messages:/app/storage/media/media_messages
+      - ./storage/media:/app/storage/media
       - ./data:/app/data
 
   worker:
@@ -46,8 +45,7 @@ services:
     volumes:
       - ./wiki:/app/wiki
       - ./assets:/app/assets
-      - ./telegram_bot_cli/voice_messages:/app/storage/media/voice_messages
-      - ./telegram_bot_cli/media_messages:/app/storage/media/media_messages
+      - ./storage/media:/app/storage/media
       - ./data:/app/data
 
   poller:
@@ -61,8 +59,7 @@ services:
     volumes:
       - ./wiki:/app/wiki
       - ./assets:/app/assets
-      - ./telegram_bot_cli/voice_messages:/app/storage/media/voice_messages
-      - ./telegram_bot_cli/media_messages:/app/storage/media/media_messages
+      - ./storage/media:/app/storage/media
       - ./data:/app/data
 
   scheduler:

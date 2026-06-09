@@ -2,58 +2,90 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from openai import AsyncOpenAI
 
 from dobby_app.config import settings
+from dobby_app.context_templates import load_context_template
 
 ConversationMessage = dict[str, str]
 
 
 @dataclass(frozen=True)
-class RoutedAction:
-    action: str
+class PlannedAction:
+    tool: str
+    operation: str | None
     arguments: dict
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class ActionPlan:
+    actions: list[PlannedAction]
     confidence: float
-    clarification: str | None = None
 
 
-ROUTER_SCHEMA = {
-    "name": "dobby_route",
+ACTION_PLAN_SCHEMA = {
+    "name": "dobby_action_plan",
     "type": "json_schema",
     "strict": True,
     "schema": {
         "type": "object",
         "additionalProperties": False,
         "properties": {
-            "action": {
-                "type": "string",
-                "enum": [
-                    "create_calendar_reminder",
-                    "create_calendar_event",
-                    "list_upcoming",
-                    "daily_briefing",
-                    "wiki_query",
-                    "chat",
-                    "clarify",
-                ],
-            },
             "confidence": {"type": "number"},
-            "clarification": {"type": ["string", "null"]},
-            "arguments": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "title": {"type": ["string", "null"]},
-                    "datetime": {"type": ["string", "null"]},
-                    "duration_minutes": {"type": ["integer", "null"]},
-                    "alarm_minutes_before": {"type": ["integer", "null"]},
-                    "query": {"type": ["string", "null"]},
+            "actions": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 5,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "tool": {"type": "string", "enum": ["message", "calendar", "wiki"]},
+                        "operation": {
+                            "type": ["string", "null"],
+                            "enum": ["create", "read", "update", "delete", "send", "none", None],
+                        },
+                        "reason": {"type": ["string", "null"]},
+                        "arguments": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "kind": {"type": ["string", "null"], "enum": ["reminder", "event", "item", None]},
+                                "title": {"type": ["string", "null"]},
+                                "datetime": {"type": ["string", "null"]},
+                                "duration_minutes": {"type": ["integer", "null"]},
+                                "alarm_minutes_before": {"type": ["integer", "null"]},
+                                "days": {"type": ["integer", "null"]},
+                                "query": {"type": ["string", "null"]},
+                                "content": {"type": ["string", "null"]},
+                                "path": {"type": ["string", "null"]},
+                                "exact_line": {"type": ["string", "null"]},
+                                "replacement": {"type": ["string", "null"]},
+                            },
+                            "required": [
+                                "kind",
+                                "title",
+                                "datetime",
+                                "duration_minutes",
+                                "alarm_minutes_before",
+                                "days",
+                                "query",
+                                "content",
+                                "path",
+                                "exact_line",
+                                "replacement",
+                            ],
+                        },
+                    },
+                    "required": ["tool", "operation", "reason", "arguments"],
                 },
-                "required": ["title", "datetime", "duration_minutes", "alarm_minutes_before", "query"],
             },
         },
-        "required": ["action", "confidence", "clarification", "arguments"],
+        "required": ["confidence", "actions"],
     },
 }
 
@@ -71,36 +103,51 @@ def _llm_input(
     return messages
 
 
-async def route_message(text: str, conversation_context: list[ConversationMessage] | None = None) -> RoutedAction:
+async def plan_actions(text: str, conversation_context: list[ConversationMessage] | None = None) -> ActionPlan:
     if not settings.openai_api_key:
-        return RoutedAction(
-            action="chat",
-            arguments={"query": text},
+        return ActionPlan(
+            actions=[
+                PlannedAction(
+                    tool="message",
+                    operation="send",
+                    arguments={"content": "I can route commands, but OPENAI_API_KEY is not configured yet."},
+                )
+            ],
             confidence=0.0,
-            clarification=None,
         )
 
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.responses.create(
         model=settings.router_model,
         input=_llm_input(
-            (
-                "You route Mark's Telegram message to one DOBBY tool. "
-                "Use calendar reminders for reminders: a timed calendar event with an alarm. "
-                "If date/time or title is missing for event/reminder creation, choose clarify. "
-                "Use the conversation context only to interpret the latest user message."
-            ),
+            _planner_system_prompt(),
             text,
             conversation_context,
         ),
-        text={"format": ROUTER_SCHEMA},
+        text={"format": ACTION_PLAN_SCHEMA},
     )
     payload = json.loads(response.output_text)
-    return RoutedAction(
-        action=payload["action"],
-        arguments=payload.get("arguments") or {},
+    actions = [
+        PlannedAction(
+            tool=item["tool"],
+            operation=item.get("operation"),
+            reason=item.get("reason"),
+            arguments=item.get("arguments") or {},
+        )
+        for item in payload.get("actions", [])
+    ]
+    return ActionPlan(
+        actions=actions,
         confidence=float(payload.get("confidence") or 0),
-        clarification=payload.get("clarification"),
+    )
+
+
+def _planner_system_prompt() -> str:
+    now = datetime.now(ZoneInfo(settings.app_timezone))
+    return (
+        load_context_template("planner.md")
+        .replace("{current_date}", now.date().isoformat())
+        .replace("{timezone}", settings.app_timezone)
     )
 
 

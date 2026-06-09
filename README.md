@@ -20,13 +20,13 @@ The bot no longer requires a public Telegram webhook. The poller disables any ex
 
 ## Persistent Memory
 
-The previous Obsidian vault has been copied to the VPS at:
+DOBBY's production vault lives at:
 
 ```text
 /opt/dobby/wiki
 ```
 
-The deployment workflow now preserves `/opt/dobby/wiki` across releases. Runtime memory operations should go through Obsidian Local REST API, backed by the synced vault.
+The deployment workflow preserves `/opt/dobby/wiki` across releases. Runtime memory operations go through Obsidian Local REST API, backed by the synced vault.
 
 Local vault path:
 
@@ -34,13 +34,33 @@ Local vault path:
 wiki/
 ```
 
-The vault includes:
+Local and VPS vaults are synced with Syncthing.
 
-- `.obsidian/` configuration.
-- `index.md` and `log.md`.
-- compiled memory pages under `wiki/pages/`.
-- immutable source notes under `wiki/raw/sources/`.
-- raw Telegram assets under `wiki/raw/assets/`.
+Synced folder:
+
+```text
+Folder ID: dobby-wiki
+Local path: /Users/kramiusmaximus/projects/dobby/wiki
+VPS path: /opt/dobby/wiki
+```
+
+Syncthing services:
+
+```text
+Mac: brew services start syncthing
+VPS: systemctl status syncthing@root
+```
+
+Device IDs:
+
+```text
+Mac: 7EEVRLL-ER4XFPW-O2HEG46-QX4BETE-W3FAHHT-ETL3MZJ-TVKXZCC-ZRWB3AB
+VPS: SBXCTYO-EJ2ZWDQ-EJ6OCKK-KSACMFL-6WXN752-2W2KNMA-HVDXKVB-DXXA4AB
+```
+
+Syncthing is configured as send/receive on both sides with permissions ignored for macOS/Linux compatibility. The current connection works through a Syncthing relay. For a direct connection, open TCP and UDP `22000` to the VPS in the provider firewall. The Syncthing GUI should stay bound to localhost; use an SSH tunnel if remote GUI access is needed.
+
+Detailed wiki structure, memory policy, and assistant filing behavior live in `dobby_app/context/planner.md`.
 
 ## Telegram Commands
 
@@ -89,7 +109,32 @@ Job commands:
 
 Plain text and voice messages without slash commands are routed through OpenAI using the model constants in `dobby_app/config.py`.
 
+Model constants:
+
+```text
+ROUTER_MODEL
+ASSISTANT_MODEL
+TRANSCRIPTION_MODEL
+WIKI_MAINTENANCE_MODEL
+DAILY_BRIEFING_MODEL
+```
+
 Every Telegram message should receive either a response, a failure reply with context, or a thumbs-up acknowledgement.
+
+The local Telegram CLI remains available for manual inspection:
+
+```bash
+.venv/bin/dobby-telegram-cli retrieve --peek
+.venv/bin/dobby-telegram-cli retrieve --download-media
+.venv/bin/dobby-telegram-cli retrieve --transcribe
+.venv/bin/dobby-telegram-cli send "hello from the bot"
+```
+
+The CLI implementation lives in `dobby_app.telegram_cli`. It reads credentials from the project `.env`, stores its update offset at `storage/telegram_offset`, and stores downloaded media under `storage/media/`.
+
+Do not treat the CLI as the production runtime. Production intake is the VPS `poller` service.
+
+Telegram voice notes arrive as OGG/Opus files. The VPS app downloads voice files under the configured media root, converts unsupported audio formats to mp3 with `ffmpeg`, then calls OpenAI transcription using `TRANSCRIPTION_MODEL`.
 
 ## Obsidian API
 
@@ -128,13 +173,72 @@ GitHub Actions runs:
 - Docker build.
 - VPS deploy after successful `main` CI.
 
+Initial VPS setup:
+
+```bash
+apt update
+apt install -y git docker.io docker-compose-v2
+systemctl enable --now docker
+git clone git@github.com:kramiusmaximus/dobby.git /opt/dobby
+cd /opt/dobby
+cp .env.example .env
+```
+
+Fill `.env` with Telegram, OpenAI, Obsidian Local REST API, and iCloud CalDAV credentials. For iCloud, use an app-specific password.
+
+```bash
+python3 deployment/setup_obsidian_local_rest.py /opt/dobby
+docker compose up -d --build
+curl http://localhost:8000/health
+```
+
+The Obsidian API is served by the Local REST API plugin on HTTP port `27123`. DOBBY containers use `http://obsidian:27123`; the same port is bound to `127.0.0.1` on the VPS for host diagnostics. HTTPS mode is disabled.
+
+On a brand-new Obsidian profile, open the Obsidian GUI through an SSH tunnel to port `3001` and accept the vault author trust prompt once so community plugins can run. The trust decision is stored under `obsidian-config/`.
+
 Deployment runs on the VPS self-hosted runner labeled `dobby-vps`. The deploy workflow preserves:
 
 - `/opt/dobby/.env`
 - `/opt/dobby/wiki`
 - `/opt/dobby/obsidian-config`
 
-See `deployment/README.md` for server setup and operational details.
+The deploy workflow expects no repository secrets. It runs on the VPS through the `dobby-vps` self-hosted runner, configures the Obsidian Local REST API plugin, rebuilds DOBBY images, runs `docker compose up -d`, and checks `/health`.
+
+VPS SSH target:
+
+```text
+ssh root@94.241.142.126
+```
+
+Local Codex credential file for this VPS:
+
+```text
+/Users/kramiusmaximus/.codex/secrets/dobby_vps.env
+```
+
+Do not commit plaintext VPS passwords or API secrets into this repository. Keep credentials in a local password manager, SSH agent, or environment file outside Git. The local Codex credential file should stay `chmod 600`.
+
+Before changing deployment behavior, preserve runtime data:
+
+- `/opt/dobby/.env`
+- `/opt/dobby/wiki`
+- `/opt/dobby/obsidian-config`
+- `/opt/dobby/assets`
+- `/opt/dobby/storage/media`
+- `/opt/dobby/data/automations`
+- PostgreSQL data volume
+- Redis data volume when queue state matters
+
+Back up PostgreSQL plus those folders daily.
+
+## Runtime Context Templates
+
+DOBBY's backend LLM behavior is guided by external Markdown templates:
+
+- `dobby_app/context/planner.md`: planner policy for choosing `message`, `calendar`, and `wiki` actions.
+- `dobby_app/context/executor.md`: deterministic executor guardrails.
+
+Prefer updating these templates when changing natural-language assistant behavior. Keep Python responsible for validation, persistence, safe mutation, and integration boundaries.
 
 ## Local Development
 

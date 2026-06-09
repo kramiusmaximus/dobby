@@ -17,11 +17,11 @@ from pathlib import Path
 from typing import Any
 
 
-APP_DIR = Path(__file__).resolve().parent
-ENV_PATH = APP_DIR / ".env"
-OFFSET_PATH = APP_DIR / ".telegram_offset"
-VOICE_DIR = APP_DIR / "voice_messages"
-MEDIA_DIR = APP_DIR / "media_messages"
+PROJECT_ROOT = Path(os.environ.get("DOBBY_ROOT", Path.cwd())).resolve()
+ENV_PATH = PROJECT_ROOT / ".env"
+OFFSET_PATH = PROJECT_ROOT / "storage" / "telegram_offset"
+VOICE_DIR = PROJECT_ROOT / "storage" / "media" / "voice_messages"
+MEDIA_DIR = PROJECT_ROOT / "storage" / "media" / "media_messages"
 TELEGRAM_API_BASE = "https://api.telegram.org"
 OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions"
 
@@ -61,9 +61,9 @@ def get_config() -> tuple[str, int]:
     user_id_raw = os.environ.get("TELEGRAM_USER_ID") or env_values.get("TELEGRAM_USER_ID", "")
 
     if not token or token == "replace_with_bot_token":
-        raise ConfigError("Set TELEGRAM_BOT_TOKEN in telegram_bot_cli/.env")
+        raise ConfigError("Set TELEGRAM_BOT_TOKEN in .env")
     if not user_id_raw or user_id_raw == "replace_with_numeric_user_id":
-        raise ConfigError("Set TELEGRAM_USER_ID in telegram_bot_cli/.env")
+        raise ConfigError("Set TELEGRAM_USER_ID in .env")
 
     try:
         user_id = int(user_id_raw)
@@ -131,6 +131,7 @@ def read_offset() -> int | None:
 
 
 def write_offset(offset: int) -> None:
+    OFFSET_PATH.parent.mkdir(parents=True, exist_ok=True)
     OFFSET_PATH.write_text(f"{offset}\n", encoding="utf-8")
 
 
@@ -313,7 +314,7 @@ def multipart_form_data(fields: dict[str, str], file_field: str, file_path: Path
 def transcribe_audio(audio_path: Path) -> str:
     api_key = get_optional_env("OPENAI_API_KEY")
     if not api_key:
-        raise TranscriptionError("Set OPENAI_API_KEY in telegram_bot_cli/.env to transcribe voice messages")
+        raise TranscriptionError("Set OPENAI_API_KEY in .env to transcribe voice messages")
 
     model = get_optional_env("TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
     upload_path = convert_audio_for_transcription(audio_path)
@@ -434,9 +435,9 @@ def build_parser() -> argparse.ArgumentParser:
     retrieve_parser = subparsers.add_parser("retrieve", help="retrieve new messages from the configured user")
     retrieve_parser.add_argument("--limit", type=int, default=100, help="maximum Telegram updates to fetch")
     retrieve_parser.add_argument("--peek", action="store_true", help="do not advance the stored update offset")
-    retrieve_parser.add_argument("--download-voice", action="store_true", help="download voice messages to voice_messages/")
-    retrieve_parser.add_argument("--download-photos", action="store_true", help="download photo messages to media_messages/photos/")
-    retrieve_parser.add_argument("--download-videos", action="store_true", help="download video messages to media_messages/videos/")
+    retrieve_parser.add_argument("--download-voice", action="store_true", help="download voice messages to storage/media/voice_messages/")
+    retrieve_parser.add_argument("--download-photos", action="store_true", help="download photo messages to storage/media/media_messages/photos/")
+    retrieve_parser.add_argument("--download-videos", action="store_true", help="download video messages to storage/media/media_messages/videos/")
     retrieve_parser.add_argument("--download-media", action="store_true", help="download photo and video messages")
     retrieve_parser.add_argument("--transcribe", action="store_true", help="download and transcribe voice messages")
 
