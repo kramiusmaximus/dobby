@@ -10,7 +10,9 @@ from dobby_app.bot_commands import register_bot_commands
 from dobby_app.config import settings
 from dobby_app.db import init_db, session_scope
 from dobby_app.message_handler import reply_to_message
+from dobby_app.runtime_status import format_startup_message, runtime_status
 from dobby_app.seed import seed_default_jobs
+from dobby_app.telegram_client import send_telegram_message
 
 
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +34,7 @@ async def poll_forever() -> None:
         await bot.delete_webhook(drop_pending_updates=False)
         await register_bot_commands(bot)
         logger.info("Telegram webhook disabled; polling every %s seconds", settings.telegram_poll_interval_seconds)
+        await _notify_startup()
 
         while True:
             try:
@@ -63,6 +66,14 @@ async def handle_update(bot: Bot, update: Update) -> None:
 
 def main() -> None:
     asyncio.run(poll_forever())
+
+
+async def _notify_startup() -> None:
+    try:
+        status = runtime_status("poller")
+        await send_telegram_message(format_startup_message("poller", status))
+    except Exception:
+        logger.exception("Could not send startup notification")
 
 
 if __name__ == "__main__":

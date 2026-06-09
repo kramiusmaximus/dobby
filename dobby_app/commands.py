@@ -10,6 +10,7 @@ from dobby_app.caldav_client import create_calendar_item, list_items
 from dobby_app.config import settings
 from dobby_app.jobs import enqueue_job
 from dobby_app.models import CaldavItem, JobRun, ScheduledJob
+from dobby_app.runtime_status import current_commit
 from dobby_app.schedules import parse_schedule
 from dobby_app.timeparse import parse_datetime
 from dobby_app.wiki_memory import handle_memory_command, sync_calendar_item_to_wiki, sync_calendar_snapshot_to_wiki
@@ -42,7 +43,11 @@ def handle_command(session: Session, text: str) -> str:
 
 
 def status() -> str:
-    return f"DOBBY is running. Telegram intake is polling every {settings.telegram_poll_interval_seconds} seconds."
+    return (
+        "DOBBY is running. "
+        f"Commit {current_commit()}. "
+        f"Telegram intake is polling every {settings.telegram_poll_interval_seconds} seconds."
+    )
 
 
 def list_jobs(session: Session) -> str:

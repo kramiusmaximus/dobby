@@ -10,6 +10,7 @@ from dobby_app.bot_commands import register_bot_commands
 from dobby_app.config import settings
 from dobby_app.db import init_db, session_scope
 from dobby_app.message_handler import reply_to_message
+from dobby_app.runtime_status import runtime_status
 from dobby_app.seed import seed_default_jobs
 
 
@@ -32,7 +33,7 @@ app = FastAPI(title="DOBBY", lifespan=lifespan)
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True}
+    return runtime_status("app")
 
 
 @app.post("/telegram/webhook")

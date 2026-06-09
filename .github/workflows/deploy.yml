@@ -50,6 +50,7 @@ jobs:
           if [ ! -d "$DEPLOY_PATH/wiki" ] && [ -d wiki ]; then
             cp -a wiki "$DEPLOY_PATH/wiki"
           fi
+          printf '%s\n' '${{ github.event.workflow_run.head_sha }}' > "$DEPLOY_PATH/.dobby-version"
 
           if [ -f /tmp/dobby.env ]; then
             mv /tmp/dobby.env "$DEPLOY_PATH/.env"
