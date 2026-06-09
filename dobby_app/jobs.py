@@ -233,8 +233,7 @@ async def _wiki_maintenance() -> dict:
 
 
 async def _telegram_reconciliation() -> dict:
-    await send_telegram_message("Telegram reconciliation checked in. Webhook handling is the primary intake path.")
-    return {"sent": True}
+    return {"sent": False, "skipped": True}
 
 
 def enqueue_job(session: Session, job: ScheduledJob) -> JobRun:

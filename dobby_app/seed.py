@@ -16,7 +16,6 @@ from dobby_app.schedules import rrule_to_cron
 
 
 JOB_TYPES = {
-    "download-handle-telegram-messages": "telegram_reconciliation",
     "daily-telegram-message": "daily_briefing",
     "dobby-wiki-maintenance": "wiki_maintenance",
 }

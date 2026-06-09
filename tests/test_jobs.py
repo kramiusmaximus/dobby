@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 
-from dobby_app.jobs import _daily_briefing
+from dobby_app.jobs import _daily_briefing, _telegram_reconciliation
 
 
 def test_daily_briefing_sends_four_formatted_messages(monkeypatch):
@@ -68,3 +68,17 @@ Buy the present before the birthday.
     assert captured["start"].hour == 0
     assert captured["start"].minute == 0
     assert (captured["end"] - captured["start"]).days == 14
+
+
+def test_telegram_reconciliation_job_is_silent(monkeypatch):
+    sent = []
+
+    async def fake_send_telegram_message(text):
+        sent.append(text)
+
+    monkeypatch.setattr("dobby_app.jobs.send_telegram_message", fake_send_telegram_message)
+
+    result = asyncio.run(_telegram_reconciliation())
+
+    assert result == {"sent": False, "skipped": True}
+    assert sent == []
