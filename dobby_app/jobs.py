@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import random
 import re
 from zoneinfo import ZoneInfo
@@ -83,7 +83,7 @@ async def _daily_briefing() -> dict:
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     tomorrow = today_start + timedelta(days=1)
     upcoming = list_items(today_start, today_start + timedelta(days=14))
-    today_items = [item for item in upcoming if _item_start(item) and _item_start(item) < tomorrow]
+    today_items = [item for item in upcoming if _is_today_item(item, tomorrow)]
     next_items = [item for item in upcoming if item not in today_items]
 
     messages = [
@@ -209,13 +209,27 @@ def _format_items(items: list[dict]) -> list[str]:
 
 def _format_item(item: dict) -> str:
     start = _item_start(item)
-    when = start.strftime("%a %b %-d, %H:%M") if start else "time unknown"
+    if isinstance(start, datetime):
+        when = start.strftime("%a %b %-d, %H:%M")
+    elif isinstance(start, date):
+        when = start.strftime("%a %b %-d, all day")
+    else:
+        when = "time unknown"
     return f"{when} - {item.get('summary', 'Untitled')}"
 
 
-def _item_start(item: dict) -> datetime | None:
+def _item_start(item: dict) -> datetime | date | None:
     start = item.get("start")
-    return start if isinstance(start, datetime) else None
+    return start if isinstance(start, (datetime, date)) else None
+
+
+def _is_today_item(item: dict, tomorrow: datetime) -> bool:
+    start = _item_start(item)
+    if isinstance(start, datetime):
+        return start < tomorrow
+    if isinstance(start, date):
+        return start < tomorrow.date()
+    return False
 
 
 def _sort_key(item: dict) -> str:

@@ -40,6 +40,7 @@ Buy the present before the birthday.
         captured["end"] = end
         return [
             {"summary": "Dentist", "start": start.replace(hour=9)},
+            {"summary": "Birthday", "start": start.date()},
             {"summary": "Studio", "start": start + timedelta(days=3, hours=15)},
         ]
 
@@ -54,12 +55,14 @@ Buy the present before the birthday.
 
     result = asyncio.run(_daily_briefing())
 
-    assert result == {"sent": True, "upcoming_count": 2}
+    assert result == {"sent": True, "upcoming_count": 3}
     assert len(sent) == 4
     assert sent[0].startswith("Start\n\n")
     assert "Calendar and Reminders" in sent[1]
     assert "Today\n- " in sent[1]
     assert "Dentist" in sent[1]
+    assert "all day - Birthday" in sent[1]
+    assert "time unknown - Birthday" not in sent[1]
     assert "Next 2 Weeks\n- " in sent[1]
     assert "Studio" in sent[1]
     assert sent[2].startswith("Other Important Reminders\n\n")
