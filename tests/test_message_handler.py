@@ -8,9 +8,10 @@ from dobby_app.message_handler import (
     _message_already_recorded,
     _recent_conversation_context,
     handle_message,
-    handle_memory_agent_command,
+    handle_memory_query_command,
     handle_plain_text,
 )
+from dobby_app.execution_results import ToolExecutionResult
 from dobby_app.models import TelegramMessage
 from dobby_app.router import ActionPlan, PlannedAction
 
@@ -45,16 +46,24 @@ def test_message_already_recorded_detects_duplicate(monkeypatch, sqlite_session)
 def test_memory_command_routes_query_to_agent(monkeypatch):
     calls = []
 
-    async def fake_answer_memory_query(query):
-        calls.append(query)
-        return "Agent answer"
+    async def fake_execute_tool_action(action, latest_text, conversation_context=None):
+        calls.append((action, latest_text, conversation_context))
+        return ToolExecutionResult(
+            tool="wiki",
+            operation="read",
+            status="success",
+            message="Agent answer",
+            data={"query": action.arguments["query"]},
+        )
 
-    monkeypatch.setattr("dobby_app.message_handler.answer_memory_query", fake_answer_memory_query)
+    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
 
-    response = asyncio.run(handle_memory_agent_command("/memory TouchDesigner"))
+    response = asyncio.run(handle_memory_query_command("/memory TouchDesigner"))
 
     assert response == "Agent answer"
-    assert calls == ["TouchDesigner"]
+    assert calls[0][0].tool == "wiki"
+    assert calls[0][0].operation == "read"
+    assert calls[0][0].arguments == {"query": "TouchDesigner"}
 
 
 def test_plain_wiki_query_routes_to_agent(monkeypatch):
@@ -80,19 +89,28 @@ def test_plain_wiki_query_routes_to_agent(monkeypatch):
             confidence=0.9,
         )
 
-    calls = []
-
-    async def fake_answer_memory_query(query):
-        calls.append(query)
-        return "Wiki answer"
+    async def fake_execute_tool_action(action, latest_text, conversation_context=None):
+        if action.tool == "wiki":
+            return ToolExecutionResult(
+                tool="wiki",
+                operation="read",
+                status="success",
+                message="Wiki answer",
+                data={"query": action.arguments["query"]},
+            )
+        return ToolExecutionResult(
+            tool="message",
+            operation="send",
+            status="success",
+            message=action.arguments["content"],
+        )
 
     monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
-    monkeypatch.setattr("dobby_app.tool_executors.answer_memory_query", fake_answer_memory_query)
+    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_plain_text("What do you remember about Narjiss?"))
 
     assert response == "Wiki answer"
-    assert calls == ["Narjiss"]
     assert plan_calls[1][0]["tool"] == "wiki"
     assert plan_calls[1][0]["message"] == "Wiki answer"
 
@@ -122,24 +140,30 @@ def test_plain_wiki_update_executes_safe_line_update(monkeypatch):
 
     calls = []
 
-    def fake_update_wiki_line(**kwargs):
-        calls.append(kwargs)
-        return "Updated wiki line in pages/goals/mother-birthday-gift.md."
+    async def fake_execute_tool_action(action, latest_text, conversation_context=None):
+        calls.append(action)
+        if action.tool == "wiki":
+            return ToolExecutionResult(
+                tool="wiki",
+                operation="update",
+                status="success",
+                message="Updated wiki line in pages/goals/mother-birthday-gift.md.",
+            )
+        return ToolExecutionResult(
+            tool="message",
+            operation="send",
+            status="success",
+            message=action.arguments["content"],
+        )
 
     monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
-    monkeypatch.setattr("dobby_app.tool_executors.update_wiki_line", fake_update_wiki_line)
+    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_plain_text("remove one"))
 
     assert response == "Removed the duplicate."
-    assert calls == [
-        {
-            "path": "pages/goals/mother-birthday-gift.md",
-            "exact_line": "- Birthday: 2026-07-08.",
-            "replacement": "",
-            "reason": "Remove duplicate reminder detail.",
-        }
-    ]
+    assert calls[0].tool == "wiki"
+    assert calls[0].arguments["exact_line"] == "- Birthday: 2026-07-08."
 
 
 def test_plain_wiki_delete_requires_exact_line(monkeypatch):
@@ -167,6 +191,23 @@ def test_plain_wiki_delete_requires_exact_line(monkeypatch):
         )
 
     monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
+
+    async def fake_execute_tool_action(action, latest_text, conversation_context=None):
+        if action.tool == "message":
+            return ToolExecutionResult(
+                tool="message",
+                operation="send",
+                status="success",
+                message=action.arguments["content"],
+            )
+        return ToolExecutionResult(
+            tool="wiki",
+            operation="delete",
+            status="needs_clarification",
+            message="Which exact wiki line should I delete?",
+        )
+
+    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_plain_text("remove one"))
 
@@ -256,6 +297,16 @@ def test_handle_message_stores_reply_metadata_and_passes_context(monkeypatch, sq
     monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
     monkeypatch.setattr("dobby_app.message_handler.settings.telegram_context_message_count", 5)
 
+    async def fake_execute_tool_action(action, latest_text, conversation_context=None):
+        return ToolExecutionResult(
+            tool="message",
+            operation="send",
+            status="success",
+            message=action.arguments["content"],
+        )
+
+    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
+
     sqlite_session.add(
         TelegramMessage(
             update_id=None,
@@ -312,6 +363,16 @@ def test_plain_text_passes_conversation_context_to_router_and_chat(monkeypatch):
         )
 
     monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
+
+    async def fake_execute_tool_action(action, latest_text, conversation_context=None):
+        return ToolExecutionResult(
+            tool="message",
+            operation="send",
+            status="success",
+            message=action.arguments["content"],
+        )
+
+    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_plain_text("Latest message", context))
 

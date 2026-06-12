@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
@@ -11,9 +12,8 @@ from sqlalchemy import select
 from dobby_app.commands import handle_command
 from dobby_app.config import settings
 from dobby_app.db import session_scope
-from dobby_app.memory_agent import answer_memory_query
 from dobby_app.models import TelegramMessage
-from dobby_app.router import ActionPlan, assistant_chat, plan_actions
+from dobby_app.router import ActionPlan, PlannedAction, assistant_chat, plan_actions
 from dobby_app.tool_executors import ToolExecutionResult, execute_tool_action
 from dobby_app.transcription import download_voice, transcribe_audio
 from dobby_app.wiki_memory import handle_memory_command
@@ -21,6 +21,12 @@ from dobby_app.wiki_memory import handle_memory_command
 
 logger = logging.getLogger(__name__)
 MAX_PLANNER_TOOL_ROUNDS = 3
+
+
+@dataclass(frozen=True)
+class HandlerResponse:
+    text: str | None = None
+    reaction_emoji: str | None = None
 
 
 async def handle_message(message: Message, bot: Bot) -> str | None:
@@ -56,14 +62,15 @@ async def handle_message(message: Message, bot: Bot) -> str | None:
         if text.startswith("/"):
             command = text.strip().split(maxsplit=1)[0].lower()
             if command == "/memory":
-                return await handle_memory_agent_command(text)
+                return await handle_memory_query_command(text)
             return handle_command(session, text)
 
         conversation_context = _recent_conversation_context(session, message.chat.id)
 
     if not text.strip():
         return None
-    return await handle_plain_text(text, conversation_context)
+    response = await handle_plain_text_result(text, conversation_context)
+    return response.text
 
 
 def _message_text(message: Message | None) -> str | None:
@@ -148,10 +155,18 @@ def _record_assistant_message(message: Message, sent_message: Message, text: str
 
 
 async def handle_plain_text(text: str, conversation_context: list[dict[str, str]] | None = None) -> str:
+    response = await handle_plain_text_result(text, conversation_context)
+    return response.text or response.reaction_emoji or ""
+
+
+async def handle_plain_text_result(
+    text: str,
+    conversation_context: list[dict[str, str]] | None = None,
+) -> HandlerResponse:
     plan = await plan_actions(text, conversation_context)
     if plan.confidence < 0.35:
-        return await assistant_chat(text, conversation_context)
-    return await execute_action_plan(plan, text, conversation_context)
+        return HandlerResponse(text=await assistant_chat(text, conversation_context))
+    return await execute_action_plan_result(plan, text, conversation_context)
 
 
 async def execute_action_plan(
@@ -159,10 +174,19 @@ async def execute_action_plan(
     text: str,
     conversation_context: list[dict[str, str]] | None = None,
 ) -> str:
+    response = await execute_action_plan_result(plan, text, conversation_context)
+    return response.text or response.reaction_emoji or ""
+
+
+async def execute_action_plan_result(
+    plan: ActionPlan,
+    text: str,
+    conversation_context: list[dict[str, str]] | None = None,
+) -> HandlerResponse:
     current_plan = plan
     all_results: list[ToolExecutionResult] = []
     for _round in range(MAX_PLANNER_TOOL_ROUNDS):
-        results = await _execute_plan_once(current_plan, text)
+        results = await _execute_plan_once(current_plan, text, conversation_context)
         all_results.extend(results)
         message_outputs = [
             result.message
@@ -170,14 +194,24 @@ async def execute_action_plan(
             if result.tool == "message" and result.status == "success" and result.message
         ]
         if message_outputs:
-            return "\n\n".join(message_outputs)
+            return HandlerResponse(text="\n\n".join(message_outputs))
+
+        reaction_outputs = [
+            str(result.data["reaction_emoji"])
+            for result in results
+            if result.tool == "message"
+            and result.status == "success"
+            and result.data.get("reaction_emoji")
+        ]
+        if reaction_outputs:
+            return HandlerResponse(reaction_emoji=reaction_outputs[-1])
 
         if not _planner_should_continue(results):
             non_message_outputs = [
                 result.message for result in results if result.message and result.status != "success"
             ]
             if non_message_outputs:
-                return "\n\n".join(non_message_outputs)
+                return HandlerResponse(text="\n\n".join(non_message_outputs))
             break
 
         current_plan = await plan_actions(
@@ -186,14 +220,18 @@ async def execute_action_plan(
             tool_results=[_result_payload(result) for result in all_results],
         )
 
-    return await assistant_chat(text, conversation_context)
+    return HandlerResponse(text=await assistant_chat(text, conversation_context))
 
 
-async def _execute_plan_once(plan: ActionPlan, text: str) -> list[ToolExecutionResult]:
+async def _execute_plan_once(
+    plan: ActionPlan,
+    text: str,
+    conversation_context: list[dict[str, str]] | None = None,
+) -> list[ToolExecutionResult]:
     results = []
     for action in plan.actions:
         try:
-            results.append(await execute_tool_action(action, text))
+            results.append(await execute_tool_action(action, text, conversation_context))
         except Exception as exc:
             results.append(
                 ToolExecutionResult(
@@ -222,18 +260,51 @@ def _result_payload(result: ToolExecutionResult) -> dict:
     }
 
 
-async def handle_memory_agent_command(text: str) -> str:
+async def handle_memory_query_command(text: str) -> str:
     rest = text[len("/memory") :].strip()
     action, _, _remainder = rest.partition(" ")
     if not rest or action.lower() in {"save", "remember"}:
         return handle_memory_command(rest)
 
-    return await answer_memory_query(rest)
+    result = await execute_tool_action(
+        PlannedAction(tool="wiki", operation="read", arguments={"query": rest}),
+        rest,
+        None,
+    )
+    return result.message or "I searched memory but did not get an answer."
 
 
 async def reply_to_message(bot: Bot, message: Message) -> None:
     try:
-        response = await handle_message(message, bot)
+        if _message_already_recorded(message):
+            logger.info("Skipping duplicate Telegram message %s in chat %s", message.message_id, message.chat.id)
+            return
+
+        text = message.text or message.caption or ""
+        if text.startswith("/") or message.voice:
+            response_text = await handle_message(message, bot)
+            response = HandlerResponse(text=response_text)
+        else:
+            reply_to_message_id = message.reply_to_message.message_id if message.reply_to_message else None
+            reply_to_text = _message_text(message.reply_to_message) if message.reply_to_message else None
+            with session_scope() as session:
+                session.add(
+                    TelegramMessage(
+                        update_id=None,
+                        message_id=message.message_id,
+                        chat_id=message.chat.id,
+                        sender_id=message.from_user.id if message.from_user else 0,
+                        text=text,
+                        kind="text",
+                        reply_to_message_id=reply_to_message_id,
+                        reply_to_text=reply_to_text,
+                        reply_to_kind=_reply_kind(session, message.chat.id, reply_to_message_id),
+                        raw=message.model_dump(mode="json"),
+                    )
+                )
+                session.flush()
+                conversation_context = _recent_conversation_context(session, message.chat.id)
+            response = await handle_plain_text_result(text, conversation_context) if text.strip() else HandlerResponse()
     except Exception as exc:
         logger.exception("Telegram message handling failed")
         await bot.send_message(
@@ -244,29 +315,37 @@ async def reply_to_message(bot: Bot, message: Message) -> None:
         )
         return
 
-    if response and response.strip():
+    if response.text and response.text.strip():
         sent_message = await bot.send_message(
             message.chat.id,
-            response,
+            response.text,
             disable_web_page_preview=True,
             reply_to_message_id=message.message_id,
         )
-        _record_assistant_message(message, sent_message, response)
+        _record_assistant_message(message, sent_message, response.text)
+        return
+
+    if response.reaction_emoji:
+        await react_to_message(bot, message, response.reaction_emoji)
         return
 
     await acknowledge_message(bot, message)
 
 
 async def acknowledge_message(bot: Bot, message: Message) -> None:
+    await react_to_message(bot, message, "👍")
+
+
+async def react_to_message(bot: Bot, message: Message, emoji: str) -> None:
     try:
         await bot.set_message_reaction(
             chat_id=message.chat.id,
             message_id=message.message_id,
-            reaction=[ReactionTypeEmoji(emoji="👍")],
+            reaction=[ReactionTypeEmoji(emoji=emoji)],
         )
     except TelegramAPIError:
         logger.exception("Could not set Telegram reaction; falling back to message acknowledgement")
-        await bot.send_message(message.chat.id, "👍", reply_to_message_id=message.message_id)
+        await bot.send_message(message.chat.id, emoji, reply_to_message_id=message.message_id)
 
 
 def _failure_message(exc: Exception) -> str:

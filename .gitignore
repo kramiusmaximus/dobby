@@ -12,6 +12,11 @@ telegram_bot_cli/.telegram_offset
 
 tmp/
 *.log
+*.db
+*.sqlite
+*.sqlite3
+*.ics
+*.ical
 
 storage/
 obsidian-config/

@@ -81,6 +81,55 @@ def create_calendar_item(
     return CalendarWriteResult(uid=uid, url=str(created.url))
 
 
+def update_calendar_item(
+    *,
+    uid: str,
+    title: str | None = None,
+    starts_at: datetime | None = None,
+    duration_minutes: int | None = None,
+    item_type: str | None = None,
+    alarm_minutes_before: int | None = None,
+    calendar_name: str | None = None,
+) -> CalendarWriteResult:
+    calendar = _calendar(calendar_name)
+    existing = calendar.event_by_uid(uid)
+    if not existing:
+        raise RuntimeError(f"CalDAV item not found: {uid}")
+
+    vevent = existing.vobject_instance.vevent
+    current_start = starts_at or vevent.dtstart.value
+    current_end = getattr(vevent, "dtend", None)
+    if duration_minutes is None and current_end is not None:
+        duration = current_end.value - vevent.dtstart.value
+    else:
+        duration = timedelta(minutes=duration_minutes or 15)
+
+    updated_title = title if title is not None else str(vevent.summary.value)
+    updated_type = item_type or _item_type_from_categories(vevent)
+    alarm = alarm_minutes_before
+
+    cal = _calendar_payload(
+        uid=uid,
+        title=updated_title,
+        starts_at=current_start,
+        duration_minutes=int(duration.total_seconds() // 60),
+        item_type=updated_type,
+        alarm_minutes_before=alarm,
+    )
+    existing.data = cal.to_ical().decode("utf-8")
+    saved = existing.save()
+    return CalendarWriteResult(uid=uid, url=str(getattr(saved, "url", existing.url)))
+
+
+def delete_calendar_item(*, uid: str, calendar_name: str | None = None) -> str:
+    calendar = _calendar(calendar_name)
+    existing = calendar.event_by_uid(uid)
+    if not existing:
+        raise RuntimeError(f"CalDAV item not found: {uid}")
+    existing.delete()
+    return uid
+
+
 def list_items(start: datetime, end: datetime, calendar_name: str | None = None) -> list[dict]:
     calendar = _calendar(calendar_name)
     events = calendar.date_search(start=start, end=end, expand=True)
@@ -97,3 +146,47 @@ def list_items(start: datetime, end: datetime, calendar_name: str | None = None)
             }
         )
     return results
+
+
+def _calendar_payload(
+    *,
+    uid: str,
+    title: str,
+    starts_at: datetime,
+    duration_minutes: int,
+    item_type: str,
+    alarm_minutes_before: int | None,
+) -> Calendar:
+    cal = Calendar()
+    cal.add("prodid", "-//DOBBY//VPS Assistant//EN")
+    cal.add("version", "2.0")
+
+    event = Event()
+    event.add("uid", uid)
+    event.add("summary", title)
+    event.add("dtstart", starts_at)
+    event.add("dtend", starts_at + timedelta(minutes=duration_minutes))
+    event.add("dtstamp", datetime.utcnow())
+    event.add("categories", [f"DOBBY-{item_type.upper()}"])
+
+    if alarm_minutes_before is not None:
+        alarm = Alarm()
+        alarm.add("action", "DISPLAY")
+        alarm.add("description", title)
+        alarm.add("trigger", timedelta(minutes=-alarm_minutes_before))
+        event.add_component(alarm)
+
+    cal.add_component(event)
+    return cal
+
+
+def _item_type_from_categories(vevent) -> str:
+    categories = getattr(vevent, "categories", None)
+    if not categories:
+        return "event"
+    values = getattr(categories, "value", []) or []
+    for value in values:
+        text = str(value)
+        if text.startswith("DOBBY-"):
+            return text.removeprefix("DOBBY-").lower()
+    return "event"

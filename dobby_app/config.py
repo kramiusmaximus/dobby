@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     telegram_poll_interval_seconds: int = 60
     telegram_context_message_count: int = Field(10, alias="TELEGRAM_CONTEXT_MESSAGE_COUNT")
     public_webhook_base_url: str = ""
+    log_level: str = Field("DEBUG", alias="LOG_LEVEL")
 
     openai_api_key: str = ""
 
@@ -37,8 +38,8 @@ class Settings(BaseSettings):
     ical_calendar_name: str = ""
     ical_reminder_calendar_name: str = ""
 
-    router_model: str = Field("gpt-4.1-mini", alias="ROUTER_MODEL")
-    assistant_model: str = Field("gpt-4.1", alias="ASSISTANT_MODEL")
+    planner_model: str = Field("gpt-4.1-mini", alias="PLANNER_MODEL")
+    executioner_model: str = Field("gpt-4.1", alias="EXECUTOR_MODEL")
     transcription_model: str = Field("gpt-4o-mini-transcribe", alias="TRANSCRIPTION_MODEL")
     wiki_maintenance_model: str = Field("gpt-4.1", alias="WIKI_MAINTENANCE_MODEL")
     daily_briefing_model: str = Field("gpt-4.1-mini", alias="DAILY_BRIEFING_MODEL")

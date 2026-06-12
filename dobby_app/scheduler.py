@@ -8,6 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from dobby_app.config import settings
 from dobby_app.db import SessionLocal, init_db
 from dobby_app.jobs import enqueue_job
+from dobby_app.logging_config import configure_logging
 from dobby_app.models import ScheduledJob
 from dobby_app.schedules import cron_trigger
 from dobby_app.seed import seed_default_jobs
@@ -51,6 +52,7 @@ def _queue_scheduled_job(job_id: int) -> None:
 
 
 def main() -> None:
+    configure_logging()
     init_db()
     scheduler = BackgroundScheduler(timezone=settings.app_timezone)
     scheduler.start()

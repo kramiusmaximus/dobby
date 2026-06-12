@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+from types import SimpleNamespace
+
 from dobby_app.context_templates import load_context_template
-from dobby_app.router import _planner_system_prompt
+from dobby_app.router import _planner_system_prompt, assistant_chat, plan_actions
 
 
 def test_planner_context_mentions_durable_daily_and_weekly_plans():
@@ -26,8 +29,62 @@ def test_tool_contexts_document_executor_operations():
     calendar_context = load_context_template("tools/calendar.md")
     wiki_context = load_context_template("tools/wiki.md")
 
-    assert "Supported operation" in message_context
-    assert "Supported operations" in calendar_context
-    assert "Supported operations" in wiki_context
-    assert "Do not perform arbitrary wiki rewrites." in wiki_context
-    assert "`exact_line`" in wiki_context
+    assert "Available tools" in message_context
+    assert "Available tools" in calendar_context
+    assert "Available tools" in wiki_context
+    assert "obsidian_write" in wiki_context
+    assert "Do not guess paths or targets." in wiki_context
+
+
+def test_planner_uses_planner_model(monkeypatch):
+    calls = []
+
+    class FakeResponses:
+        async def create(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(
+                output_text=(
+                    '{"confidence": 0.9, "actions": [{"tool": "message", "operation": "send", '
+                    '"reason": null, "arguments": {"kind": null, "title": null, "datetime": null, '
+                    '"duration_minutes": null, "alarm_minutes_before": null, "days": null, '
+                    '"query": null, "content": "Hi", "path": null, "exact_line": null, '
+                    '"replacement": null}}]}'
+                )
+            )
+
+    class FakeAsyncOpenAI:
+        def __init__(self, api_key):
+            assert api_key == "test-key"
+            self.responses = FakeResponses()
+
+    monkeypatch.setattr("dobby_app.router.AsyncOpenAI", FakeAsyncOpenAI)
+    monkeypatch.setattr("dobby_app.router.settings.openai_api_key", "test-key")
+    monkeypatch.setattr("dobby_app.router.settings.planner_model", "planner-test-model")
+
+    plan = asyncio.run(plan_actions("hello"))
+
+    assert plan.actions[0].tool == "message"
+    assert calls[0]["model"] == "planner-test-model"
+
+
+def test_assistant_fallback_uses_executioner_model(monkeypatch):
+    calls = []
+
+    class FakeResponses:
+        async def create(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(output_text="Fallback answer")
+
+    class FakeAsyncOpenAI:
+        def __init__(self, api_key):
+            assert api_key == "test-key"
+            self.responses = FakeResponses()
+
+    monkeypatch.setattr("dobby_app.router.AsyncOpenAI", FakeAsyncOpenAI)
+    monkeypatch.setattr("dobby_app.router.settings.openai_api_key", "test-key")
+    monkeypatch.setattr("dobby_app.router.settings.executioner_model", "executioner-test-model")
+
+    response = asyncio.run(assistant_chat("hello"))
+
+    assert response == "Fallback answer"
+    assert calls[0]["model"] == "executioner-test-model"

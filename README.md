@@ -112,8 +112,8 @@ Plain text and voice messages without slash commands are routed through OpenAI u
 Model constants:
 
 ```text
-ROUTER_MODEL
-ASSISTANT_MODEL
+PLANNER_MODEL
+EXECUTOR_MODEL
 TRANSCRIPTION_MODEL
 WIKI_MAINTENANCE_MODEL
 DAILY_BRIEFING_MODEL
@@ -236,7 +236,9 @@ Back up PostgreSQL plus those folders daily.
 DOBBY's backend LLM behavior is guided by external Markdown templates:
 
 - `dobby_app/context/planner.md`: planner policy for choosing `message`, `calendar`, and `wiki` actions.
-- `dobby_app/context/executor.md`: deterministic executor guardrails.
+- `dobby_app/context/tools/message.md`: message executioner prompt and tool contract.
+- `dobby_app/context/tools/wiki.md`: wiki executioner prompt and tool contract.
+- `dobby_app/context/tools/calendar.md`: calendar executioner prompt and tool contract.
 
 Prefer updating these templates when changing natural-language assistant behavior. Keep Python responsible for validation, persistence, safe mutation, and integration boundaries.
 

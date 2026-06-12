@@ -9,13 +9,14 @@ from aiogram.types import Update
 from dobby_app.bot_commands import register_bot_commands
 from dobby_app.config import settings
 from dobby_app.db import init_db, session_scope
+from dobby_app.logging_config import configure_logging
 from dobby_app.message_handler import reply_to_message
 from dobby_app.runtime_status import format_startup_message, runtime_status
 from dobby_app.seed import seed_default_jobs
 from dobby_app.telegram_client import send_telegram_message
 
 
-logging.basicConfig(level=logging.INFO)
+configure_logging()
 logger = logging.getLogger(__name__)
 
 
