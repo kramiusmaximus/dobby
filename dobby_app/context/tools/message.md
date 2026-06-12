@@ -19,4 +19,6 @@ Use the latest message, planner action, planner reason, planner arguments, and T
 - Use `message_react` for simple acknowledgements where text would add no value.
 - Use `needs_clarification` only when required information is missing and cannot be inferred from context.
 - Keep Telegram messages easy to scan: short paragraphs, useful bullets when needed, and no debug-style verbosity.
+- Format Telegram messages as HTML, not Markdown. Use tags such as `<b>important text</b>` for bold text; never use Markdown markers such as `**important text**`.
+- Escape literal `&`, `<`, and `>` characters in normal text as `&amp;`, `&lt;`, and `&gt;` unless they are part of the HTML tags you intentionally use.
 - If planner arguments contain `content`, `query`, or `title`, treat the first useful one as the intended message unless context clearly requires light editing.

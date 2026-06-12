@@ -32,6 +32,8 @@ def test_tool_contexts_document_executor_operations():
     assert "Available tools" in message_context
     assert "Available tools" in calendar_context
     assert "Available tools" in wiki_context
+    assert "Format Telegram messages as HTML, not Markdown." in message_context
+    assert "<b>important text</b>" in message_context
     assert "obsidian_write" in wiki_context
     assert "Do not guess paths or targets." in wiki_context
 

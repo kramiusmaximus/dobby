@@ -310,6 +310,7 @@ async def reply_to_message(bot: Bot, message: Message) -> None:
         await bot.send_message(
             message.chat.id,
             _failure_message(exc),
+            parse_mode="HTML",
             disable_web_page_preview=True,
             reply_to_message_id=message.message_id,
         )
@@ -319,6 +320,7 @@ async def reply_to_message(bot: Bot, message: Message) -> None:
         sent_message = await bot.send_message(
             message.chat.id,
             response.text,
+            parse_mode="HTML",
             disable_web_page_preview=True,
             reply_to_message_id=message.message_id,
         )

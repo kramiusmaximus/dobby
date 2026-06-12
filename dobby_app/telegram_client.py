@@ -19,6 +19,7 @@ async def send_telegram_message(text: str) -> None:
         await bot.send_message(
             chat_id=settings.telegram_user_id,
             text=text,
+            parse_mode="HTML",
             disable_web_page_preview=True,
         )
     finally:

@@ -125,18 +125,7 @@ Planner and executioner startup logs include the configured model and reasoning 
 
 Every Telegram message should receive either a response, a failure reply with context, or a thumbs-up acknowledgement.
 
-The local Telegram CLI remains available for manual inspection:
-
-```bash
-.venv/bin/dobby-telegram-cli retrieve --peek
-.venv/bin/dobby-telegram-cli retrieve --download-media
-.venv/bin/dobby-telegram-cli retrieve --transcribe
-.venv/bin/dobby-telegram-cli send "hello from the bot"
-```
-
-The CLI implementation lives in `dobby_app.telegram_cli`. It reads credentials from the project `.env`, stores its update offset at `storage/telegram_offset`, and stores downloaded media under `storage/media/`.
-
-Do not treat the CLI as the production runtime. Production intake is the VPS `poller` service.
+Production Telegram intake is handled by the VPS `poller` service or webhook route. Runtime Telegram sends use `dobby_app.telegram_client`.
 
 Telegram voice notes arrive as OGG/Opus files. The VPS app downloads voice files under the configured media root, converts unsupported audio formats to mp3 with `ffmpeg`, then calls OpenAI transcription using `TRANSCRIPTION_MODEL`.
 
