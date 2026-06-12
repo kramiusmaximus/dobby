@@ -38,8 +38,10 @@ class Settings(BaseSettings):
     ical_calendar_name: str = ""
     ical_reminder_calendar_name: str = ""
 
-    planner_model: str = Field("gpt-4.1-mini", alias="PLANNER_MODEL")
-    executioner_model: str = Field("gpt-4.1", alias="EXECUTOR_MODEL")
+    planner_model: str = Field("gpt-5.5", alias="PLANNER_MODEL")
+    planner_reasoning_effort: str = Field("low", alias="PLANNER_REASONING_EFFORT")
+    executioner_model: str = Field("gpt-5.4-mini", alias="EXECUTOR_MODEL")
+    executioner_reasoning_effort: str = Field("medium", alias="EXECUTOR_REASONING_EFFORT")
     transcription_model: str = Field("gpt-4o-mini-transcribe", alias="TRANSCRIPTION_MODEL")
     wiki_maintenance_model: str = Field("gpt-4.1", alias="WIKI_MAINTENANCE_MODEL")
     daily_briefing_model: str = Field("gpt-4.1-mini", alias="DAILY_BRIEFING_MODEL")
@@ -57,6 +59,14 @@ class Settings(BaseSettings):
         if value == "":
             return None
         return value
+
+    @field_validator("planner_reasoning_effort", "executioner_reasoning_effort")
+    @classmethod
+    def validate_reasoning_effort(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"minimal", "low", "medium", "high"}:
+            raise ValueError("reasoning effort must be one of: minimal, low, medium, high")
+        return normalized
 
     @property
     def effective_obsidian_enabled(self) -> bool:

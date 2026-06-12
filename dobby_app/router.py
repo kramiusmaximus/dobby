@@ -126,8 +126,9 @@ async def plan_actions(
     tool_results: list[dict[str, Any]] | None = None,
 ) -> ActionPlan:
     logger.info(
-        "Planner starting: model=%s text=%s conversation_messages=%s tool_results=%s",
+        "Planner starting: model=%s reasoning_effort=%s text=%s conversation_messages=%s tool_results=%s",
         settings.planner_model,
+        settings.planner_reasoning_effort,
         _truncate_for_log(text),
         len(conversation_context or []),
         _truncate_for_log(json.dumps(tool_results, ensure_ascii=False, default=str)) if tool_results else None,
@@ -149,6 +150,7 @@ async def plan_actions(
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.responses.create(
         model=settings.planner_model,
+        reasoning=_reasoning(settings.planner_reasoning_effort),
         input=_llm_input(
             _planner_system_prompt(),
             text,
@@ -187,8 +189,9 @@ def _planner_system_prompt() -> str:
 
 async def assistant_chat(text: str, conversation_context: list[ConversationMessage] | None = None) -> str:
     logger.info(
-        "Assistant fallback starting: model=%s text=%s conversation_messages=%s",
+        "Assistant fallback starting: model=%s reasoning_effort=%s text=%s conversation_messages=%s",
         settings.executioner_model,
+        settings.executioner_reasoning_effort,
         _truncate_for_log(text),
         len(conversation_context or []),
     )
@@ -198,6 +201,7 @@ async def assistant_chat(text: str, conversation_context: list[ConversationMessa
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.responses.create(
         model=settings.executioner_model,
+        reasoning=_reasoning(settings.executioner_reasoning_effort),
         input=_llm_input(
             "You are DOBBY, Mark's personal assistant. Be concise and useful in Telegram.",
             text,
@@ -228,6 +232,10 @@ def _action_plan_for_log(plan: ActionPlan) -> str:
             default=str,
         )
     )
+
+
+def _reasoning(effort: str) -> dict[str, str]:
+    return {"effort": effort}
 
 
 def _truncate_for_log(value: str, max_chars: int = MAX_LOG_CHARS) -> str:

@@ -39,6 +39,7 @@ def _patch_openai(monkeypatch, fake_responses):
     monkeypatch.setattr("dobby_app.executioner_agent.AsyncOpenAI", FakeAsyncOpenAI)
     monkeypatch.setattr("dobby_app.executioner_agent.settings.openai_api_key", "test-key")
     monkeypatch.setattr("dobby_app.executioner_agent.settings.executioner_model", "executioner-test-model")
+    monkeypatch.setattr("dobby_app.executioner_agent.settings.executioner_reasoning_effort", "medium")
 
 
 def test_message_executioner_uses_context_and_executor_model(monkeypatch):
@@ -56,6 +57,7 @@ def test_message_executioner_uses_context_and_executor_model(monkeypatch):
     assert result.status == "success"
     assert result.message == "Handled"
     assert responses.requests[0]["model"] == "executioner-test-model"
+    assert responses.requests[0]["reasoning"] == {"effort": "medium"}
     assert "You produce Telegram text for Mark." in responses.requests[0]["input"][0]["content"]
 
 
@@ -155,7 +157,9 @@ def test_wiki_executioner_answers_memory_query_with_obsidian_tool_loop(monkeypat
     assert result.status == "success"
     assert result.message == "Studio context lives in pages/projects/studio.md."
     assert responses.requests[0]["model"] == "executioner-test-model"
+    assert responses.requests[0]["reasoning"] == {"effort": "medium"}
     assert responses.requests[1]["model"] == "executioner-test-model"
+    assert responses.requests[1]["reasoning"] == {"effort": "medium"}
 
 
 def test_wiki_executioner_requires_path_for_delete(monkeypatch):

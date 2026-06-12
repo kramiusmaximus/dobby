@@ -113,11 +113,15 @@ Model constants:
 
 ```text
 PLANNER_MODEL
+PLANNER_REASONING_EFFORT
 EXECUTOR_MODEL
+EXECUTOR_REASONING_EFFORT
 TRANSCRIPTION_MODEL
 WIKI_MAINTENANCE_MODEL
 DAILY_BRIEFING_MODEL
 ```
+
+Planner and executioner startup logs include the configured model and reasoning effort. Defaults are `PLANNER_MODEL=gpt-5.5` with `PLANNER_REASONING_EFFORT=low`, and `EXECUTOR_MODEL=gpt-5.4-mini` with `EXECUTOR_REASONING_EFFORT=medium`.
 
 Every Telegram message should receive either a response, a failure reply with context, or a thumbs-up acknowledgement.
 

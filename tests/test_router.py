@@ -60,11 +60,13 @@ def test_planner_uses_planner_model(monkeypatch):
     monkeypatch.setattr("dobby_app.router.AsyncOpenAI", FakeAsyncOpenAI)
     monkeypatch.setattr("dobby_app.router.settings.openai_api_key", "test-key")
     monkeypatch.setattr("dobby_app.router.settings.planner_model", "planner-test-model")
+    monkeypatch.setattr("dobby_app.router.settings.planner_reasoning_effort", "low")
 
     plan = asyncio.run(plan_actions("hello"))
 
     assert plan.actions[0].tool == "message"
     assert calls[0]["model"] == "planner-test-model"
+    assert calls[0]["reasoning"] == {"effort": "low"}
 
 
 def test_assistant_fallback_uses_executioner_model(monkeypatch):
@@ -83,8 +85,10 @@ def test_assistant_fallback_uses_executioner_model(monkeypatch):
     monkeypatch.setattr("dobby_app.router.AsyncOpenAI", FakeAsyncOpenAI)
     monkeypatch.setattr("dobby_app.router.settings.openai_api_key", "test-key")
     monkeypatch.setattr("dobby_app.router.settings.executioner_model", "executioner-test-model")
+    monkeypatch.setattr("dobby_app.router.settings.executioner_reasoning_effort", "medium")
 
     response = asyncio.run(assistant_chat("hello"))
 
     assert response == "Fallback answer"
     assert calls[0]["model"] == "executioner-test-model"
+    assert calls[0]["reasoning"] == {"effort": "medium"}

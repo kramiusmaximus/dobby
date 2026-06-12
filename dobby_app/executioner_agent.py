@@ -40,9 +40,10 @@ async def run_executioner_agent(
 ) -> ToolExecutionResult:
     tool_names = [tool.schema["name"] for tool in tools]
     logger.info(
-        "Executioner starting: executor=%s model=%s action=%s tools=%s conversation_messages=%s latest_text=%s",
+        "Executioner starting: executor=%s model=%s reasoning_effort=%s action=%s tools=%s conversation_messages=%s latest_text=%s",
         executor_name,
         settings.executioner_model,
+        settings.executioner_reasoning_effort,
         _planned_action_for_log(action),
         tool_names,
         len(conversation_context or []),
@@ -68,6 +69,7 @@ async def run_executioner_agent(
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.responses.create(
         model=settings.executioner_model,
+        reasoning=_reasoning(settings.executioner_reasoning_effort),
         input=executioner_input,
         tools=[tool.schema for tool in tools],
     )
@@ -134,6 +136,7 @@ async def run_executioner_agent(
 
         response = await client.responses.create(
             model=settings.executioner_model,
+            reasoning=_reasoning(settings.executioner_reasoning_effort),
             previous_response_id=response.id,
             input=tool_outputs,
             tools=[tool.schema for tool in tools],
@@ -194,6 +197,10 @@ def _executioner_system_prompt(executor_name: str, context_template: str) -> str
         f"Timezone: {settings.app_timezone}\n\n"
         f"{load_context_template(context_template)}"
     )
+
+
+def _reasoning(effort: str) -> dict[str, str]:
+    return {"effort": effort}
 
 
 async def _execute_wrapper(
