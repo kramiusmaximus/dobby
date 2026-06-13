@@ -92,8 +92,8 @@ def test_wiki_executioner_calls_raw_write_wrapper(monkeypatch):
             calls.append((path, content))
             return "ok"
 
-    monkeypatch.setattr("dobby_app.executioners.wiki.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.executioners.wiki.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.executioners.wiki_tools.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.executioners.wiki_tools.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
         execute_wiki_action(
@@ -144,8 +144,8 @@ def test_wiki_executioner_answers_memory_query_with_obsidian_tool_loop(monkeypat
             assert path == "index.md"
             return "# Index\n\n- [[Studio Project]]"
 
-    monkeypatch.setattr("dobby_app.executioners.wiki.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.executioners.wiki.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.executioners.wiki_tools.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.executioners.wiki_tools.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
         execute_wiki_action(
@@ -196,7 +196,7 @@ def test_calendar_executioner_calls_create_wrapper(monkeypatch):
     _patch_openai(monkeypatch, responses)
 
     monkeypatch.setattr(
-        "dobby_app.executioners.calendar._create_calendar_item",
+        "dobby_app.executioners.calendar_tools.create_calendar_item_from_text",
         lambda title, when, item_type, alarm_minutes_before, duration_minutes, calendar_name: (
             f"Created {item_type}: {title} at parsed."
         ),
@@ -231,7 +231,7 @@ def test_calendar_delete_calls_delete_wrapper(monkeypatch):
     _patch_openai(monkeypatch, responses)
     calls = []
     monkeypatch.setattr(
-        "dobby_app.caldav_client.delete_calendar_item",
+        "dobby_app.executioners.calendar_tools.delete_calendar_item",
         lambda **kwargs: calls.append(kwargs) or "event-uid",
     )
 

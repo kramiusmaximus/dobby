@@ -11,10 +11,10 @@ from openai import AsyncOpenAI
 
 from dobby_app.config import settings
 from dobby_app.context_templates import load_context_template
+from dobby_app.llm_logging import action_plan_for_log, reasoning, truncate_for_log
 
 ConversationMessage = dict[str, str]
 logger = logging.getLogger(__name__)
-MAX_LOG_CHARS = 4000
 
 
 @dataclass(frozen=True)
@@ -129,9 +129,9 @@ async def plan_actions(
         "Planner starting: model=%s reasoning_effort=%s text=%s conversation_messages=%s tool_results=%s",
         settings.planner_model,
         settings.planner_reasoning_effort,
-        _truncate_for_log(text),
+        truncate_for_log(text),
         len(conversation_context or []),
-        _truncate_for_log(json.dumps(tool_results, ensure_ascii=False, default=str)) if tool_results else None,
+        truncate_for_log(json.dumps(tool_results, ensure_ascii=False, default=str)) if tool_results else None,
     )
     if not settings.openai_api_key:
         plan = ActionPlan(
@@ -144,13 +144,13 @@ async def plan_actions(
             ],
             confidence=0.0,
         )
-        logger.info("Planner fallback plan: %s", _action_plan_for_log(plan))
+        logger.info("Planner fallback plan: %s", action_plan_for_log(plan))
         return plan
 
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.responses.create(
         model=settings.planner_model,
-        reasoning=_reasoning(settings.planner_reasoning_effort),
+        reasoning=reasoning(settings.planner_reasoning_effort),
         input=_llm_input(
             _planner_system_prompt(),
             text,
@@ -173,8 +173,8 @@ async def plan_actions(
         actions=actions,
         confidence=float(payload.get("confidence") or 0),
     )
-    logger.info("Planner raw response: %s", _truncate_for_log(response.output_text))
-    logger.info("Planner plan: %s", _action_plan_for_log(plan))
+    logger.info("Planner raw response: %s", truncate_for_log(response.output_text))
+    logger.info("Planner plan: %s", action_plan_for_log(plan))
     return plan
 
 
@@ -192,7 +192,7 @@ async def assistant_chat(text: str, conversation_context: list[ConversationMessa
         "Assistant fallback starting: model=%s reasoning_effort=%s text=%s conversation_messages=%s",
         settings.executioner_model,
         settings.executioner_reasoning_effort,
-        _truncate_for_log(text),
+        truncate_for_log(text),
         len(conversation_context or []),
     )
     if not settings.openai_api_key:
@@ -201,7 +201,7 @@ async def assistant_chat(text: str, conversation_context: list[ConversationMessa
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.responses.create(
         model=settings.executioner_model,
-        reasoning=_reasoning(settings.executioner_reasoning_effort),
+        reasoning=reasoning(settings.executioner_reasoning_effort),
         input=_llm_input(
             "You are DOBBY, Mark's personal assistant. Be concise and useful in Telegram.",
             text,
@@ -209,36 +209,5 @@ async def assistant_chat(text: str, conversation_context: list[ConversationMessa
         ),
     )
     final = response.output_text.strip()
-    logger.info("Assistant fallback result: %s", _truncate_for_log(final))
+    logger.info("Assistant fallback result: %s", truncate_for_log(final))
     return final
-
-
-def _action_plan_for_log(plan: ActionPlan) -> str:
-    return _truncate_for_log(
-        json.dumps(
-            {
-                "confidence": plan.confidence,
-                "actions": [
-                    {
-                        "tool": action.tool,
-                        "operation": action.operation,
-                        "reason": action.reason,
-                        "arguments": action.arguments,
-                    }
-                    for action in plan.actions
-                ],
-            },
-            ensure_ascii=False,
-            default=str,
-        )
-    )
-
-
-def _reasoning(effort: str) -> dict[str, str]:
-    return {"effort": effort}
-
-
-def _truncate_for_log(value: str, max_chars: int = MAX_LOG_CHARS) -> str:
-    if len(value) <= max_chars:
-        return value
-    return value[:max_chars].rstrip() + "...[truncated]"

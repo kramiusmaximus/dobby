@@ -5,8 +5,6 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 
 from dobby_app.message_handler import (
-    _message_already_recorded,
-    _recent_conversation_context,
     handle_message,
     handle_memory_query_command,
     handle_plain_text,
@@ -14,6 +12,7 @@ from dobby_app.message_handler import (
 from dobby_app.execution_results import ToolExecutionResult
 from dobby_app.models import TelegramMessage
 from dobby_app.router import ActionPlan, PlannedAction
+from dobby_app.telegram_history import message_already_recorded, recent_conversation_context
 
 
 def test_message_already_recorded_detects_duplicate(monkeypatch, sqlite_session):
@@ -22,10 +21,10 @@ def test_message_already_recorded_detects_duplicate(monkeypatch, sqlite_session)
         yield sqlite_session
         sqlite_session.commit()
 
-    monkeypatch.setattr("dobby_app.message_handler.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.telegram_history.session_scope", fake_session_scope)
     message = SimpleNamespace(message_id=1988, chat=SimpleNamespace(id=1106380883))
 
-    assert not _message_already_recorded(message)
+    assert not message_already_recorded(message)
 
     sqlite_session.add(
         TelegramMessage(
@@ -40,7 +39,7 @@ def test_message_already_recorded_detects_duplicate(monkeypatch, sqlite_session)
     )
     sqlite_session.commit()
 
-    assert _message_already_recorded(message)
+    assert message_already_recorded(message)
 
 
 def test_memory_command_routes_query_to_agent(monkeypatch):
@@ -105,8 +104,8 @@ def test_plain_wiki_query_routes_to_agent(monkeypatch):
             message=action.arguments["content"],
         )
 
-    monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
-    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
+    monkeypatch.setattr("dobby_app.planner_runner.plan_actions", fake_plan_actions)
+    monkeypatch.setattr("dobby_app.planner_runner.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_plain_text("What do you remember about Narjiss?"))
 
@@ -156,8 +155,8 @@ def test_plain_wiki_update_executes_safe_line_update(monkeypatch):
             message=action.arguments["content"],
         )
 
-    monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
-    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
+    monkeypatch.setattr("dobby_app.planner_runner.plan_actions", fake_plan_actions)
+    monkeypatch.setattr("dobby_app.planner_runner.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_plain_text("remove one"))
 
@@ -190,7 +189,7 @@ def test_plain_wiki_delete_requires_exact_line(monkeypatch):
             confidence=0.9,
         )
 
-    monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
+    monkeypatch.setattr("dobby_app.planner_runner.plan_actions", fake_plan_actions)
 
     async def fake_execute_tool_action(action, latest_text, conversation_context=None):
         if action.tool == "message":
@@ -207,7 +206,7 @@ def test_plain_wiki_delete_requires_exact_line(monkeypatch):
             message="Which exact wiki line should I delete?",
         )
 
-    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
+    monkeypatch.setattr("dobby_app.planner_runner.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_plain_text("remove one"))
 
@@ -215,7 +214,7 @@ def test_plain_wiki_delete_requires_exact_line(monkeypatch):
 
 
 def test_recent_conversation_context_uses_latest_messages_in_order(monkeypatch, sqlite_session):
-    monkeypatch.setattr("dobby_app.message_handler.settings.telegram_context_message_count", 2)
+    monkeypatch.setattr("dobby_app.telegram_history.settings.telegram_context_message_count", 2)
     for index in range(5):
         sqlite_session.add(
             TelegramMessage(
@@ -255,7 +254,7 @@ def test_recent_conversation_context_uses_latest_messages_in_order(monkeypatch, 
     )
     sqlite_session.commit()
 
-    context = _recent_conversation_context(sqlite_session, 1106380883)
+    context = recent_conversation_context(sqlite_session, 1106380883)
 
     assert context == [
         {"role": "assistant", "content": "assistant reply"},
@@ -294,8 +293,9 @@ def test_handle_message_stores_reply_metadata_and_passes_context(monkeypatch, sq
         )
 
     monkeypatch.setattr("dobby_app.message_handler.session_scope", fake_session_scope)
-    monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
-    monkeypatch.setattr("dobby_app.message_handler.settings.telegram_context_message_count", 5)
+    monkeypatch.setattr("dobby_app.telegram_history.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.planner_runner.plan_actions", fake_plan_actions)
+    monkeypatch.setattr("dobby_app.telegram_history.settings.telegram_context_message_count", 5)
 
     async def fake_execute_tool_action(action, latest_text, conversation_context=None):
         return ToolExecutionResult(
@@ -305,7 +305,7 @@ def test_handle_message_stores_reply_metadata_and_passes_context(monkeypatch, sq
             message=action.arguments["content"],
         )
 
-    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
+    monkeypatch.setattr("dobby_app.planner_runner.execute_tool_action", fake_execute_tool_action)
 
     sqlite_session.add(
         TelegramMessage(
@@ -362,7 +362,7 @@ def test_plain_text_passes_conversation_context_to_router_and_chat(monkeypatch):
             confidence=0.9,
         )
 
-    monkeypatch.setattr("dobby_app.message_handler.plan_actions", fake_plan_actions)
+    monkeypatch.setattr("dobby_app.planner_runner.plan_actions", fake_plan_actions)
 
     async def fake_execute_tool_action(action, latest_text, conversation_context=None):
         return ToolExecutionResult(
@@ -372,7 +372,7 @@ def test_plain_text_passes_conversation_context_to_router_and_chat(monkeypatch):
             message=action.arguments["content"],
         )
 
-    monkeypatch.setattr("dobby_app.message_handler.execute_tool_action", fake_execute_tool_action)
+    monkeypatch.setattr("dobby_app.planner_runner.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_plain_text("Latest message", context))
 

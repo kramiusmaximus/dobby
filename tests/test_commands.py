@@ -108,8 +108,8 @@ def test_today_lists_one_day_of_calendar_items(monkeypatch, sqlite_session):
         captured["days"] = (end - start).days
         return [{"summary": "Dentist", "start": datetime(2026, 6, 8, 9, 0)}]
 
-    monkeypatch.setattr("dobby_app.commands.list_items", fake_list_items)
-    monkeypatch.setattr("dobby_app.commands.sync_calendar_snapshot_to_wiki", lambda items: synced.extend(items))
+    monkeypatch.setattr("dobby_app.command_calendar.list_items", fake_list_items)
+    monkeypatch.setattr("dobby_app.command_calendar.sync_calendar_snapshot_to_wiki", lambda items: synced.extend(items))
 
     response = handle_command(sqlite_session, "/today")
 
@@ -126,8 +126,8 @@ def test_upcoming_lists_fourteen_days_of_calendar_items(monkeypatch, sqlite_sess
         captured["days"] = (end - start).days
         return [{"summary": "Studio", "start": datetime(2026, 6, 12, 15, 0)}]
 
-    monkeypatch.setattr("dobby_app.commands.list_items", fake_list_items)
-    monkeypatch.setattr("dobby_app.commands.sync_calendar_snapshot_to_wiki", lambda items: synced.extend(items))
+    monkeypatch.setattr("dobby_app.command_calendar.list_items", fake_list_items)
+    monkeypatch.setattr("dobby_app.command_calendar.sync_calendar_snapshot_to_wiki", lambda items: synced.extend(items))
 
     response = handle_command(sqlite_session, "/upcoming")
 
@@ -141,9 +141,9 @@ def test_remind_creates_calendar_reminder(monkeypatch, sqlite_session):
     calls = []
     starts_at = datetime(2026, 6, 8, 9, 0)
 
-    monkeypatch.setattr("dobby_app.commands.parse_datetime", lambda text: starts_at)
+    monkeypatch.setattr("dobby_app.command_calendar.parse_datetime", lambda text: starts_at)
     monkeypatch.setattr(
-        "dobby_app.commands.sync_calendar_item_to_wiki",
+        "dobby_app.command_calendar.sync_calendar_item_to_wiki",
         lambda **kwargs: calls.append(("wiki", kwargs)) or "pages/calendar/june-2026-commitments.md",
     )
 
@@ -152,7 +152,7 @@ def test_remind_creates_calendar_reminder(monkeypatch, sqlite_session):
         created.update(kwargs)
         return CalendarWriteResult(uid="reminder-uid", url="caldav://reminder")
 
-    monkeypatch.setattr("dobby_app.commands.create_calendar_item", fake_create_calendar_item)
+    monkeypatch.setattr("dobby_app.command_calendar.create_calendar_item", fake_create_calendar_item)
 
     response = handle_command(sqlite_session, "/remind Call dentist at tomorrow 9")
 
@@ -170,9 +170,9 @@ def test_event_creates_calendar_event(monkeypatch, sqlite_session):
     calls = []
     starts_at = datetime(2026, 6, 12, 15, 0)
 
-    monkeypatch.setattr("dobby_app.commands.parse_datetime", lambda text: starts_at)
+    monkeypatch.setattr("dobby_app.command_calendar.parse_datetime", lambda text: starts_at)
     monkeypatch.setattr(
-        "dobby_app.commands.sync_calendar_item_to_wiki",
+        "dobby_app.command_calendar.sync_calendar_item_to_wiki",
         lambda **kwargs: calls.append(("wiki", kwargs)) or "pages/calendar/june-2026-commitments.md",
     )
 
@@ -181,7 +181,7 @@ def test_event_creates_calendar_event(monkeypatch, sqlite_session):
         created.update(kwargs)
         return CalendarWriteResult(uid="event-uid", url="caldav://event")
 
-    monkeypatch.setattr("dobby_app.commands.create_calendar_item", fake_create_calendar_item)
+    monkeypatch.setattr("dobby_app.command_calendar.create_calendar_item", fake_create_calendar_item)
 
     response = handle_command(sqlite_session, "/event Studio visit at Friday 15:00")
 
@@ -214,7 +214,7 @@ def test_job_run_enqueues_job(monkeypatch, sqlite_session):
         session.flush()
         return run
 
-    monkeypatch.setattr("dobby_app.commands.enqueue_job", fake_enqueue_job)
+    monkeypatch.setattr("dobby_app.command_jobs.enqueue_job", fake_enqueue_job)
 
     response = handle_command(sqlite_session, "/job run daily-briefing")
 
@@ -261,7 +261,7 @@ def test_job_retry_enqueues_original_job(monkeypatch, sqlite_session):
         session.flush()
         return run
 
-    monkeypatch.setattr("dobby_app.commands.enqueue_job", fake_enqueue_job)
+    monkeypatch.setattr("dobby_app.command_jobs.enqueue_job", fake_enqueue_job)
 
     response = handle_command(sqlite_session, f"/job retry {failed_run.id}")
 

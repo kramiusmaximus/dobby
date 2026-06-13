@@ -47,11 +47,11 @@ Buy the present before the birthday.
     async def fake_send_telegram_message(text):
         sent.append(text)
 
-    monkeypatch.setattr("dobby_app.jobs.random.choice", lambda options: options[0])
-    monkeypatch.setattr("dobby_app.jobs.list_items", fake_list_items)
-    monkeypatch.setattr("dobby_app.jobs.send_telegram_message", fake_send_telegram_message)
-    monkeypatch.setattr("dobby_app.jobs.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.jobs.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.daily_briefing.random.choice", lambda options: options[0])
+    monkeypatch.setattr("dobby_app.daily_briefing.list_items", fake_list_items)
+    monkeypatch.setattr("dobby_app.daily_briefing.send_telegram_message", fake_send_telegram_message)
+    monkeypatch.setattr("dobby_app.daily_briefing.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.daily_briefing.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(_daily_briefing())
 

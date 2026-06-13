@@ -13,11 +13,18 @@ from openai import AsyncOpenAI
 from dobby_app.config import settings
 from dobby_app.context_templates import load_context_template
 from dobby_app.execution_results import ToolExecutionResult
+from dobby_app.llm_logging import (
+    planned_action_for_log,
+    reasoning,
+    result_for_log,
+    tool_call_for_log,
+    truncate,
+    truncate_for_log,
+)
 from dobby_app.router import ConversationMessage, PlannedAction
 
 MAX_TOOL_OUTPUT_CHARS = 12000
 MAX_EXECUTIONER_TOOL_ROUNDS = 6
-MAX_LOG_CHARS = 4000
 logger = logging.getLogger(__name__)
 
 
@@ -44,10 +51,10 @@ async def run_executioner_agent(
         executor_name,
         settings.executioner_model,
         settings.executioner_reasoning_effort,
-        _planned_action_for_log(action),
+        planned_action_for_log(action),
         tool_names,
         len(conversation_context or []),
-        _truncate_for_log(latest_text),
+        truncate_for_log(latest_text),
     )
     if not settings.openai_api_key:
         result = ToolExecutionResult(
@@ -56,7 +63,7 @@ async def run_executioner_agent(
             status="failed",
             message="OPENAI_API_KEY is not configured, so executioner agents are unavailable.",
         )
-        logger.info("Executioner unavailable: executor=%s result=%s", executor_name, _result_for_log(result))
+        logger.info("Executioner unavailable: executor=%s result=%s", executor_name, result_for_log(result))
         return result
 
     tool_map = {tool.schema["name"]: tool for tool in tools}
@@ -64,12 +71,12 @@ async def run_executioner_agent(
     logger.info(
         "Executioner input prepared: executor=%s input=%s",
         executor_name,
-        _truncate_for_log(json.dumps(executioner_input, ensure_ascii=False, default=str)),
+        truncate_for_log(json.dumps(executioner_input, ensure_ascii=False, default=str)),
     )
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.responses.create(
         model=settings.executioner_model,
-        reasoning=_reasoning(settings.executioner_reasoning_effort),
+        reasoning=reasoning(settings.executioner_reasoning_effort),
         input=executioner_input,
         tools=[tool.schema for tool in tools],
     )
@@ -81,8 +88,8 @@ async def run_executioner_agent(
             executor_name,
             round_index + 1,
             getattr(response, "id", None),
-            [_tool_call_for_log(call) for call in tool_calls],
-            _truncate_for_log(getattr(response, "output_text", "") or ""),
+            [tool_call_for_log(call) for call in tool_calls],
+            truncate_for_log(getattr(response, "output_text", "") or ""),
         )
         if not tool_calls:
             final = response.output_text.strip()
@@ -93,7 +100,7 @@ async def run_executioner_agent(
                     status="success",
                     message=final,
                 )
-                logger.info("Executioner final text result: executor=%s result=%s", executor_name, _result_for_log(result))
+                logger.info("Executioner final text result: executor=%s result=%s", executor_name, result_for_log(result))
                 return result
             result = ToolExecutionResult(
                 tool=action.tool,
@@ -101,7 +108,7 @@ async def run_executioner_agent(
                 status="failed",
                 message="The executioner agent finished without a result.",
             )
-            logger.info("Executioner empty result: executor=%s result=%s", executor_name, _result_for_log(result))
+            logger.info("Executioner empty result: executor=%s result=%s", executor_name, result_for_log(result))
             return result
 
         tool_outputs = []
@@ -119,9 +126,9 @@ async def run_executioner_agent(
             logger.info(
                 "Executioner tool result: executor=%s tool_call=%s terminal=%s result=%s",
                 executor_name,
-                _tool_call_for_log(call),
+                tool_call_for_log(call),
                 bool(wrapper and wrapper.terminal),
-                _result_for_log(result),
+                result_for_log(result),
             )
             tool_outputs.append(
                 {
@@ -131,12 +138,12 @@ async def run_executioner_agent(
                 }
             )
             if wrapper and wrapper.terminal:
-                logger.info("Executioner terminal tool result: executor=%s result=%s", executor_name, _result_for_log(result))
+                logger.info("Executioner terminal tool result: executor=%s result=%s", executor_name, result_for_log(result))
                 return result
 
         response = await client.responses.create(
             model=settings.executioner_model,
-            reasoning=_reasoning(settings.executioner_reasoning_effort),
+            reasoning=reasoning(settings.executioner_reasoning_effort),
             previous_response_id=response.id,
             input=tool_outputs,
             tools=[tool.schema for tool in tools],
@@ -150,7 +157,7 @@ async def run_executioner_agent(
             status="success",
             message=final,
         )
-        logger.info("Executioner final text after budget: executor=%s result=%s", executor_name, _result_for_log(result))
+        logger.info("Executioner final text after budget: executor=%s result=%s", executor_name, result_for_log(result))
         return result
     result = ToolExecutionResult(
         tool=action.tool,
@@ -158,7 +165,7 @@ async def run_executioner_agent(
         status="failed",
         message="The executioner agent could not finish within the tool budget.",
     )
-    logger.info("Executioner tool budget exhausted: executor=%s result=%s", executor_name, _result_for_log(result))
+    logger.info("Executioner tool budget exhausted: executor=%s result=%s", executor_name, result_for_log(result))
     return result
 
 
@@ -199,10 +206,6 @@ def _executioner_system_prompt(executor_name: str, context_template: str) -> str
     )
 
 
-def _reasoning(effort: str) -> dict[str, str]:
-    return {"effort": effort}
-
-
 async def _execute_wrapper(
     wrapper: ExecutionTool,
     call: dict[str, Any],
@@ -213,7 +216,7 @@ async def _execute_wrapper(
         logger.info(
             "Executioner executing wrapper: tool=%s args=%s",
             call.get("name"),
-            _truncate_for_log(json.dumps(args, ensure_ascii=False, default=str)),
+            truncate_for_log(json.dumps(args, ensure_ascii=False, default=str)),
         )
         result = wrapper.handler(**args)
         if inspect.isawaitable(result):
@@ -226,7 +229,7 @@ async def _execute_wrapper(
             status="failed",
             message=str(exc),
         )
-        logger.exception("Executioner wrapper failed: tool=%s result=%s", call.get("name"), _result_for_log(result))
+        logger.exception("Executioner wrapper failed: tool=%s result=%s", call.get("name"), result_for_log(result))
         return result
 
 
@@ -265,53 +268,4 @@ def _tool_payload(result: Any) -> dict[str, Any]:
 
 
 def _json_tool_output(payload: dict[str, Any]) -> str:
-    return _truncate(json.dumps(payload, ensure_ascii=False, default=str), MAX_TOOL_OUTPUT_CHARS)
-
-
-def _truncate(text: str, max_chars: int) -> str:
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars].rstrip() + "\n[truncated]"
-
-
-def _planned_action_for_log(action: PlannedAction) -> str:
-    return _truncate_for_log(
-        json.dumps(
-            {
-                "tool": action.tool,
-                "operation": action.operation,
-                "reason": action.reason,
-                "arguments": action.arguments,
-            },
-            ensure_ascii=False,
-            default=str,
-        )
-    )
-
-
-def _tool_call_for_log(call: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "call_id": call.get("call_id"),
-        "name": call.get("name"),
-        "arguments": _truncate_for_log(call.get("arguments") or ""),
-    }
-
-
-def _result_for_log(result: Any) -> str:
-    if isinstance(result, ToolExecutionResult):
-        payload = {
-            "tool": result.tool,
-            "operation": result.operation,
-            "status": result.status,
-            "message": result.message,
-            "data": result.data,
-        }
-    else:
-        payload = result
-    return _truncate_for_log(json.dumps(payload, ensure_ascii=False, default=str))
-
-
-def _truncate_for_log(value: str, max_chars: int = MAX_LOG_CHARS) -> str:
-    if len(value) <= max_chars:
-        return value
-    return value[:max_chars].rstrip() + "...[truncated]"
+    return truncate(json.dumps(payload, ensure_ascii=False, default=str), MAX_TOOL_OUTPUT_CHARS)
