@@ -75,8 +75,8 @@ def test_memory_save_updates_obsidian_memory(monkeypatch, sqlite_session):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.services.memory_notes.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.memory_notes.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: client)
 
     response = handle_command(sqlite_session, "/memory save Mark prefers concise Telegram acknowledgements")
 

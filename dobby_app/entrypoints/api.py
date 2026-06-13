@@ -12,7 +12,7 @@ from dobby_app.db.session import init_db, session_scope
 from dobby_app.config.logging import configure_logging
 from dobby_app.services.telegram_messages import reply_to_message
 from dobby_app.utils.runtime_status import runtime_status
-from dobby_app.services.job_seed import seed_default_jobs
+from dobby_app.workflows.job_seed import seed_default_jobs
 
 
 configure_logging()

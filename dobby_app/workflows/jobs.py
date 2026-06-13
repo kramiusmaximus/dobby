@@ -5,7 +5,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from dobby_app.services.daily_briefing import daily_briefing
+from dobby_app.workflows.daily_briefing import daily_briefing
 from dobby_app.db.session import SessionLocal
 from dobby_app.db.models import JobRun, ScheduledJob
 from dobby_app.integrations.telegram import send_telegram_message

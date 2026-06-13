@@ -8,11 +8,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from dobby_app.config.settings import settings
 from dobby_app.db.session import SessionLocal, init_db
 from dobby_app.db.repositories.jobs import list_all_scheduled_jobs
-from dobby_app.services.jobs import enqueue_job
+from dobby_app.workflows.jobs import enqueue_job
 from dobby_app.config.logging import configure_logging
 from dobby_app.db.models import ScheduledJob
 from dobby_app.utils.schedules import cron_trigger
-from dobby_app.services.job_seed import seed_default_jobs
+from dobby_app.workflows.job_seed import seed_default_jobs
 
 
 def sync_scheduler(scheduler: BackgroundScheduler) -> None:

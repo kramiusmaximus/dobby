@@ -246,7 +246,8 @@ The Python package is organized by layer:
 - `dobby_app/config/`: settings and logging setup.
 - `dobby_app/db/`: SQLAlchemy session setup, models, and database repositories.
 - `dobby_app/integrations/`: external systems such as Telegram, CalDAV, Obsidian, OpenAI, Redis/RQ, and transcription.
-- `dobby_app/services/`: application behavior for calendar operations, jobs, daily briefings, durable memory, and Telegram message history.
+- `dobby_app/services/`: domain application behavior for calendar operations, durable memory, and Telegram message handling.
+- `dobby_app/workflows/`: background workflows for scheduled jobs, default job seeding, and daily briefings.
 - `dobby_app/assistant/`: planner, executioner loop, tool dispatch, LLM logging, and result types. Tool schemas and wrappers live in `dobby_app/assistant/tools/`.
 - `dobby_app/commands/`: Telegram slash-command dispatchers and command-specific handlers.
 - `dobby_app/entrypoints/`: process entrypoints for FastAPI, polling, scheduler, and worker services.

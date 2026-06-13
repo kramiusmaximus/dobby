@@ -12,7 +12,7 @@ from dobby_app.db.repositories.calendar_items import (
     try_update_caldav_record,
 )
 from dobby_app.db.models import CaldavItem
-from dobby_app.services.memory_notes import sync_calendar_item_to_memory, sync_calendar_snapshot_to_memory
+from dobby_app.services.memory import sync_calendar_item_to_memory, sync_calendar_snapshot_to_memory
 
 
 def list_calendar_items_and_sync(
