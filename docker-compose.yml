@@ -20,7 +20,7 @@ services:
 
   app:
     build: .
-    command: uvicorn dobby_app.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn dobby_app.entrypoints.api:app --host 0.0.0.0 --port 8000
     env_file: .env
     depends_on:
       - obsidian
@@ -36,7 +36,7 @@ services:
 
   worker:
     build: .
-    command: python -m dobby_app.worker
+    command: python -m dobby_app.entrypoints.worker
     env_file: .env
     depends_on:
       - obsidian
@@ -50,7 +50,7 @@ services:
 
   poller:
     build: .
-    command: python -m dobby_app.poller
+    command: python -m dobby_app.entrypoints.poller
     env_file: .env
     depends_on:
       - obsidian
@@ -64,7 +64,7 @@ services:
 
   scheduler:
     build: .
-    command: python -m dobby_app.scheduler
+    command: python -m dobby_app.entrypoints.scheduler
     env_file: .env
     depends_on:
       - obsidian

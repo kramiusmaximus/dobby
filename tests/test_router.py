@@ -59,7 +59,7 @@ def test_planner_uses_planner_model(monkeypatch):
             assert api_key == "test-key"
             self.responses = FakeResponses()
 
-    monkeypatch.setattr("dobby_app.router.AsyncOpenAI", FakeAsyncOpenAI)
+    monkeypatch.setattr("dobby_app.llm_client.AsyncOpenAI", FakeAsyncOpenAI)
     monkeypatch.setattr("dobby_app.router.settings.openai_api_key", "test-key")
     monkeypatch.setattr("dobby_app.router.settings.planner_model", "planner-test-model")
     monkeypatch.setattr("dobby_app.router.settings.planner_reasoning_effort", "low")
@@ -84,7 +84,7 @@ def test_assistant_fallback_uses_executioner_model(monkeypatch):
             assert api_key == "test-key"
             self.responses = FakeResponses()
 
-    monkeypatch.setattr("dobby_app.router.AsyncOpenAI", FakeAsyncOpenAI)
+    monkeypatch.setattr("dobby_app.llm_client.AsyncOpenAI", FakeAsyncOpenAI)
     monkeypatch.setattr("dobby_app.router.settings.openai_api_key", "test-key")
     monkeypatch.setattr("dobby_app.router.settings.executioner_model", "executioner-test-model")
     monkeypatch.setattr("dobby_app.router.settings.executioner_reasoning_effort", "medium")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dobby_app.execution_results import ToolExecutionResult
+from dobby_app.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.llm_logging import tool_execution_result_payload
 from dobby_app.router import ActionPlan, assistant_chat, plan_actions
 from dobby_app.tool_executors import execute_tool_action
@@ -39,7 +39,7 @@ async def execute_action_plan_result(
         message_outputs = [
             result.message
             for result in results
-            if result.tool == "message" and result.status == "success" and result.message
+            if result.tool == "message" and result.status == ToolStatus.SUCCESS and result.message
         ]
         if message_outputs:
             return HandlerResponse(text="\n\n".join(message_outputs))
@@ -48,7 +48,7 @@ async def execute_action_plan_result(
             str(result.data["reaction_emoji"])
             for result in results
             if result.tool == "message"
-            and result.status == "success"
+            and result.status == ToolStatus.SUCCESS
             and result.data.get("reaction_emoji")
         ]
         if reaction_outputs:
@@ -56,7 +56,7 @@ async def execute_action_plan_result(
 
         if not planner_should_continue(results):
             non_message_outputs = [
-                result.message for result in results if result.message and result.status != "success"
+                result.message for result in results if result.message and result.status != ToolStatus.SUCCESS
             ]
             if non_message_outputs:
                 return HandlerResponse(text="\n\n".join(non_message_outputs))
@@ -85,7 +85,7 @@ async def execute_plan_once(
                 ToolExecutionResult(
                     tool=action.tool,
                     operation=action.operation,
-                    status="failed",
+                    status=ToolStatus.FAILED,
                     message=f"I could not complete that: {exc}",
                 )
             )
@@ -93,6 +93,6 @@ async def execute_plan_once(
 
 
 def planner_should_continue(results: list[ToolExecutionResult]) -> bool:
-    if any(result.tool == "message" and result.status == "success" for result in results):
+    if any(result.tool == "message" and result.status == ToolStatus.SUCCESS for result in results):
         return False
     return any(result.tool != "message" for result in results)

@@ -2,29 +2,25 @@ from __future__ import annotations
 
 from typing import Any
 
-from dobby_app.execution_results import ToolExecutionResult
+from dobby_app.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.executioners.common import schema
-from dobby_app.obsidian_client import get_obsidian_client, obsidian_is_enabled
+from dobby_app.wiki_service import wiki_service
 
 
 def obsidian_health() -> Any:
-    require_obsidian()
-    return get_obsidian_client().health()
+    return wiki_service.health()
 
 
 def obsidian_list(path: str | None = None) -> Any:
-    require_obsidian()
-    return get_obsidian_client().list(path or "")
+    return wiki_service.list(path)
 
 
 def obsidian_search_simple(query: str) -> Any:
-    require_obsidian()
-    return get_obsidian_client().search_simple(query)
+    return wiki_service.search_simple(query)
 
 
 def obsidian_search_structured(jsonlogic: dict[str, Any]) -> Any:
-    require_obsidian()
-    return get_obsidian_client().search_structured(jsonlogic)
+    return wiki_service.search_structured(jsonlogic)
 
 
 def obsidian_read(
@@ -32,28 +28,23 @@ def obsidian_read(
     target_type: str | None = None,
     target: str | None = None,
 ) -> str:
-    require_obsidian()
-    return get_obsidian_client().read(path, target_type=target_type, target=target)
+    return wiki_service.read(path, target_type=target_type, target=target)
 
 
 def obsidian_document_map(path: str) -> Any:
-    require_obsidian()
-    return get_obsidian_client().document_map(path)
+    return wiki_service.document_map(path)
 
 
 def obsidian_tags() -> Any:
-    require_obsidian()
-    return get_obsidian_client().tags()
+    return wiki_service.tags()
 
 
 def obsidian_active_file_path() -> str:
-    require_obsidian()
-    return get_obsidian_client().active_file_path()
+    return wiki_service.active_file_path()
 
 
 def obsidian_open_file(path: str) -> Any:
-    require_obsidian()
-    return get_obsidian_client().open_file(path)
+    return wiki_service.open_file(path)
 
 
 def obsidian_write(path: str | None = None, content: str | None = None) -> ToolExecutionResult:
@@ -61,15 +52,14 @@ def obsidian_write(path: str | None = None, content: str | None = None) -> ToolE
         return ToolExecutionResult(
             tool="wiki",
             operation="write",
-            status="needs_clarification",
+            status=ToolStatus.NEEDS_CLARIFICATION,
             message="Which wiki path and content should I write?",
         )
-    require_obsidian()
-    message = get_obsidian_client().write(path, content)
+    message = wiki_service.write(path, content)
     return ToolExecutionResult(
         tool="wiki",
         operation="write",
-        status="success",
+        status=ToolStatus.SUCCESS,
         message=message or f"Wrote wiki file: {path}.",
         data={"path": path},
     )
@@ -85,15 +75,14 @@ def obsidian_append(
         return ToolExecutionResult(
             tool="wiki",
             operation="append",
-            status="needs_clarification",
+            status=ToolStatus.NEEDS_CLARIFICATION,
             message="Which wiki path and content should I append?",
         )
-    require_obsidian()
-    message = get_obsidian_client().append(path, content, target_type=target_type, target=target)
+    message = wiki_service.append(path, content, target_type=target_type, target=target)
     return ToolExecutionResult(
         tool="wiki",
         operation="append",
-        status="success",
+        status=ToolStatus.SUCCESS,
         message=message or f"Appended to wiki file: {path}.",
         data={"path": path, "target_type": target_type, "target": target},
     )
@@ -111,11 +100,10 @@ def obsidian_patch(
         return ToolExecutionResult(
             tool="wiki",
             operation="patch",
-            status="needs_clarification",
+            status=ToolStatus.NEEDS_CLARIFICATION,
             message="Which wiki path, target, patch operation, and content should I apply?",
         )
-    require_obsidian()
-    message = get_obsidian_client().patch(
+    message = wiki_service.patch(
         path,
         content,
         operation=operation,
@@ -126,7 +114,7 @@ def obsidian_patch(
     return ToolExecutionResult(
         tool="wiki",
         operation="patch",
-        status="success",
+        status=ToolStatus.SUCCESS,
         message=message or f"Patched wiki file: {path}.",
         data={"path": path, "operation": operation, "target_type": target_type, "target": target},
     )
@@ -137,23 +125,21 @@ def obsidian_delete(path: str | None = None) -> ToolExecutionResult:
         return ToolExecutionResult(
             tool="wiki",
             operation="delete",
-            status="needs_clarification",
+            status=ToolStatus.NEEDS_CLARIFICATION,
             message="Which wiki path should I delete?",
         )
-    require_obsidian()
-    message = get_obsidian_client().delete(path)
+    message = wiki_service.delete(path)
     return ToolExecutionResult(
         tool="wiki",
         operation="delete",
-        status="success",
+        status=ToolStatus.SUCCESS,
         message=message or f"Deleted wiki file: {path}.",
         data={"path": path},
     )
 
 
 def require_obsidian() -> None:
-    if not obsidian_is_enabled():
-        raise RuntimeError("Obsidian API is not configured, so DOBBY memory queries are unavailable.")
+    wiki_service.require_enabled()
 
 
 def obsidian_health_schema() -> dict:

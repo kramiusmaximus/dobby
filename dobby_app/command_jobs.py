@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
+from dobby_app.job_repository import find_scheduled_job, list_scheduled_jobs, recent_job_runs
 from dobby_app.jobs import enqueue_job
 from dobby_app.models import JobRun, ScheduledJob
 from dobby_app.schedules import parse_schedule
 
 
 def list_jobs(session: Session) -> str:
-    jobs = session.query(ScheduledJob).order_by(ScheduledJob.name).all()
+    jobs = list_scheduled_jobs(session)
     if not jobs:
         return "No jobs configured."
     lines = ["Jobs:"]
@@ -22,7 +22,7 @@ def list_jobs(session: Session) -> str:
 
 
 def queue_status(session: Session) -> str:
-    runs = session.query(JobRun).order_by(desc(JobRun.id)).limit(10).all()
+    runs = recent_job_runs(session)
     if not runs:
         return "Queue is empty."
     lines = ["Recent queue runs:"]
@@ -77,10 +77,4 @@ def handle_job_command(session: Session, rest: str) -> str:
 
 
 def find_job(session: Session, name: str) -> ScheduledJob:
-    needle = name.strip()
-    job = session.query(ScheduledJob).filter_by(name=needle).one_or_none()
-    if not job:
-        job = session.query(ScheduledJob).filter(ScheduledJob.name.like(f"%{needle}%")).first()
-    if not job:
-        raise ValueError(f"Job not found: {needle}")
-    return job
+    return find_scheduled_job(session, name)

@@ -8,14 +8,12 @@ from datetime import datetime
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
-from openai import AsyncOpenAI
-
 from dobby_app.config import settings
 from dobby_app.context_templates import load_context_template
-from dobby_app.execution_results import ToolExecutionResult
+from dobby_app.execution_results import ToolExecutionResult, ToolStatus
+from dobby_app.llm_client import create_response
 from dobby_app.llm_logging import (
     planned_action_for_log,
-    reasoning,
     result_for_log,
     tool_call_for_log,
     truncate,
@@ -60,7 +58,7 @@ async def run_executioner_agent(
         result = ToolExecutionResult(
             tool=action.tool,
             operation=action.operation,
-            status="failed",
+            status=ToolStatus.FAILED,
             message="OPENAI_API_KEY is not configured, so executioner agents are unavailable.",
         )
         logger.info("Executioner unavailable: executor=%s result=%s", executor_name, result_for_log(result))
@@ -73,10 +71,10 @@ async def run_executioner_agent(
         executor_name,
         truncate_for_log(json.dumps(executioner_input, ensure_ascii=False, default=str)),
     )
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
-    response = await client.responses.create(
+    response = await create_response(
+        api_key=settings.openai_api_key,
         model=settings.executioner_model,
-        reasoning=reasoning(settings.executioner_reasoning_effort),
+        reasoning_effort=settings.executioner_reasoning_effort,
         input=executioner_input,
         tools=[tool.schema for tool in tools],
     )
@@ -97,7 +95,7 @@ async def run_executioner_agent(
                 result = ToolExecutionResult(
                     tool=action.tool,
                     operation=action.operation,
-                    status="success",
+                    status=ToolStatus.SUCCESS,
                     message=final,
                 )
                 logger.info("Executioner final text result: executor=%s result=%s", executor_name, result_for_log(result))
@@ -105,7 +103,7 @@ async def run_executioner_agent(
             result = ToolExecutionResult(
                 tool=action.tool,
                 operation=action.operation,
-                status="failed",
+                status=ToolStatus.FAILED,
                 message="The executioner agent finished without a result.",
             )
             logger.info("Executioner empty result: executor=%s result=%s", executor_name, result_for_log(result))
@@ -118,7 +116,7 @@ async def run_executioner_agent(
                 result = ToolExecutionResult(
                     tool=action.tool,
                     operation=action.operation,
-                    status="unsupported",
+                    status=ToolStatus.UNSUPPORTED,
                     message=f"Unsupported executioner tool: {call['name']}",
                 )
             else:
@@ -141,9 +139,10 @@ async def run_executioner_agent(
                 logger.info("Executioner terminal tool result: executor=%s result=%s", executor_name, result_for_log(result))
                 return result
 
-        response = await client.responses.create(
+        response = await create_response(
+            api_key=settings.openai_api_key,
             model=settings.executioner_model,
-            reasoning=reasoning(settings.executioner_reasoning_effort),
+            reasoning_effort=settings.executioner_reasoning_effort,
             previous_response_id=response.id,
             input=tool_outputs,
             tools=[tool.schema for tool in tools],
@@ -154,7 +153,7 @@ async def run_executioner_agent(
         result = ToolExecutionResult(
             tool=action.tool,
             operation=action.operation,
-            status="success",
+            status=ToolStatus.SUCCESS,
             message=final,
         )
         logger.info("Executioner final text after budget: executor=%s result=%s", executor_name, result_for_log(result))
@@ -162,7 +161,7 @@ async def run_executioner_agent(
     result = ToolExecutionResult(
         tool=action.tool,
         operation=action.operation,
-        status="failed",
+        status=ToolStatus.FAILED,
         message="The executioner agent could not finish within the tool budget.",
     )
     logger.info("Executioner tool budget exhausted: executor=%s result=%s", executor_name, result_for_log(result))
@@ -226,7 +225,7 @@ async def _execute_wrapper(
         result = ToolExecutionResult(
             tool=action.tool,
             operation=action.operation,
-            status="failed",
+            status=ToolStatus.FAILED,
             message=str(exc),
         )
         logger.exception("Executioner wrapper failed: tool=%s result=%s", call.get("name"), result_for_log(result))
@@ -258,7 +257,7 @@ def _function_calls(response: Any) -> list[dict[str, Any]]:
 def _tool_payload(result: Any) -> dict[str, Any]:
     if isinstance(result, ToolExecutionResult):
         return {
-            "ok": result.status == "success",
+            "ok": result.status == ToolStatus.SUCCESS,
             "terminal": True,
             "status": result.status,
             "message": result.message,

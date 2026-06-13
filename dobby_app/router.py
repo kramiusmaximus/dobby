@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+import json
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from openai import AsyncOpenAI
-
 from dobby_app.config import settings
 from dobby_app.context_templates import load_context_template
-from dobby_app.llm_logging import action_plan_for_log, reasoning, truncate_for_log
+from dobby_app.llm_client import create_response
+from dobby_app.llm_logging import action_plan_for_log, truncate_for_log
 
 ConversationMessage = dict[str, str]
 logger = logging.getLogger(__name__)
@@ -147,10 +146,10 @@ async def plan_actions(
         logger.info("Planner fallback plan: %s", action_plan_for_log(plan))
         return plan
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
-    response = await client.responses.create(
+    response = await create_response(
+        api_key=settings.openai_api_key,
         model=settings.planner_model,
-        reasoning=reasoning(settings.planner_reasoning_effort),
+        reasoning_effort=settings.planner_reasoning_effort,
         input=_llm_input(
             _planner_system_prompt(),
             text,
@@ -198,10 +197,10 @@ async def assistant_chat(text: str, conversation_context: list[ConversationMessa
     if not settings.openai_api_key:
         return "I can route commands, but OPENAI_API_KEY is not configured yet."
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
-    response = await client.responses.create(
+    response = await create_response(
+        api_key=settings.openai_api_key,
         model=settings.executioner_model,
-        reasoning=reasoning(settings.executioner_reasoning_effort),
+        reasoning_effort=settings.executioner_reasoning_effort,
         input=_llm_input(
             "You are DOBBY, Mark's personal assistant. Be concise and useful in Telegram.",
             text,

@@ -3,19 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from dobby_app.caldav_client import create_calendar_item, delete_calendar_item, list_items, update_calendar_item
-from dobby_app.config import settings
-from dobby_app.db import session_scope
-from dobby_app.execution_results import ToolExecutionResult
-from dobby_app.executioners.calendar_records import (
-    stored_alarm_minutes_before,
-    try_delete_caldav_record,
-    try_update_caldav_record,
+from dobby_app.calendar_service import (
+    create_execution_calendar_item,
+    delete_execution_calendar_item,
+    list_calendar_items_and_sync,
+    update_execution_calendar_item,
 )
+from dobby_app.config import settings
+from dobby_app.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.executioners.common import schema
-from dobby_app.models import CaldavItem
 from dobby_app.timeparse import parse_datetime
-from dobby_app.wiki_memory import sync_calendar_snapshot_to_wiki
 
 
 def calendar_read_range(
@@ -28,15 +25,14 @@ def calendar_read_range(
     else:
         starts_at = datetime.now(ZoneInfo(settings.app_timezone))
     ends_at = parse_datetime(end) if end else starts_at + timedelta(days=14)
-    items = list_items(starts_at, ends_at, calendar_name=calendar_name)
-    sync_calendar_snapshot_to_wiki(items)
+    items = list_calendar_items_and_sync(starts_at, ends_at, calendar_name=calendar_name)
     message = "Nothing scheduled." if not items else "\n".join(
         f"- {item['summary']} — {item['start']}" for item in items
     )
     return ToolExecutionResult(
         tool="calendar",
         operation="read",
-        status="success",
+        status=ToolStatus.SUCCESS,
         message=message,
         data={"start": starts_at, "end": ends_at, "calendar_name": calendar_name, "items": items},
     )
@@ -54,7 +50,7 @@ def calendar_create(
         return ToolExecutionResult(
             tool="calendar",
             operation="create",
-            status="needs_clarification",
+            status=ToolStatus.NEEDS_CLARIFICATION,
             message="What should I put on the calendar, and when?",
         )
     item_type = "reminder" if kind == "reminder" else "event"
@@ -64,7 +60,7 @@ def calendar_create(
     return ToolExecutionResult(
         tool="calendar",
         operation="create",
-        status="success",
+        status=ToolStatus.SUCCESS,
         message=create_calendar_item_from_text(title, datetime, item_type, alarm, duration_minutes, calendar_name),
         data={
             "title": title,
@@ -89,37 +85,26 @@ def calendar_update(
         return ToolExecutionResult(
             tool="calendar",
             operation="update",
-            status="needs_clarification",
+            status=ToolStatus.NEEDS_CLARIFICATION,
             message="Which calendar item UID should I update?",
         )
     starts_at = parse_datetime(datetime) if datetime else None
     item_type = "reminder" if kind == "reminder" else "event" if kind == "event" else None
-    stored_alarm = stored_alarm_minutes_before(uid)
-    result = update_calendar_item(
+    url = update_execution_calendar_item(
         uid=uid,
         title=title,
         starts_at=starts_at,
-        duration_minutes=duration_minutes,
         item_type=item_type,
-        alarm_minutes_before=alarm_minutes_before if alarm_minutes_before is not None else stored_alarm,
-        calendar_name=calendar_name,
-    )
-    try_update_caldav_record(
-        uid=uid,
-        title=title,
-        item_type=item_type,
-        starts_at=starts_at,
         duration_minutes=duration_minutes,
         alarm_minutes_before=alarm_minutes_before,
-        calendar_url=result.url,
-        updated_at=datetime.utcnow(),
+        calendar_name=calendar_name,
     )
     return ToolExecutionResult(
         tool="calendar",
         operation="update",
-        status="success",
+        status=ToolStatus.SUCCESS,
         message=f"Updated calendar item: {uid}.",
-        data={"uid": uid, "url": result.url},
+        data={"uid": uid, "url": url},
     )
 
 
@@ -128,15 +113,14 @@ def calendar_delete(uid: str | None = None, calendar_name: str | None = None) ->
         return ToolExecutionResult(
             tool="calendar",
             operation="delete",
-            status="needs_clarification",
+            status=ToolStatus.NEEDS_CLARIFICATION,
             message="Which calendar item UID should I delete?",
         )
-    delete_calendar_item(uid=uid, calendar_name=calendar_name)
-    try_delete_caldav_record(uid)
+    delete_execution_calendar_item(uid=uid, calendar_name=calendar_name)
     return ToolExecutionResult(
         tool="calendar",
         operation="delete",
-        status="success",
+        status=ToolStatus.SUCCESS,
         message=f"Deleted calendar item: {uid}.",
         data={"uid": uid},
     )
@@ -151,27 +135,14 @@ def create_calendar_item_from_text(
     calendar_name: str | None,
 ) -> str:
     starts_at = parse_datetime(when)
-    with session_scope() as session:
-        result = create_calendar_item(
-            title=title,
-            starts_at=starts_at,
-            duration_minutes=duration_minutes or 15,
-            item_type=item_type,
-            alarm_minutes_before=alarm_minutes_before,
-            calendar_name=calendar_name,
-        )
-        session.add(
-            CaldavItem(
-                uid=result.uid,
-                calendar_url=result.url,
-                title=title,
-                item_type=item_type,
-                starts_at=starts_at,
-                ends_at=starts_at,
-                alarm_minutes_before=alarm_minutes_before,
-            )
-        )
-    return f"Created {item_type}: {title} at {starts_at}."
+    return create_execution_calendar_item(
+        title=title,
+        starts_at=starts_at,
+        item_type=item_type,
+        alarm_minutes_before=alarm_minutes_before,
+        duration_minutes=duration_minutes,
+        calendar_name=calendar_name,
+    )
 
 
 def calendar_read_schema() -> dict:

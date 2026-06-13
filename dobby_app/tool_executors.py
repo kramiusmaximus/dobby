@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from dobby_app.execution_results import ToolExecutionResult
+from dobby_app.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.executioners.calendar import execute_calendar_action
 from dobby_app.executioners.message import execute_message_action
 from dobby_app.executioners.wiki import execute_wiki_action
@@ -38,7 +38,7 @@ async def execute_tool_action(
     result = ToolExecutionResult(
         tool=action.tool,
         operation=action.operation,
-        status="unsupported",
+        status=ToolStatus.UNSUPPORTED,
         message=f"Unsupported tool: {action.tool}",
     )
     logger.info("Executor action unsupported: result=%s", result_for_log(result))

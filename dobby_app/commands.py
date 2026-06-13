@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from sqlalchemy.orm import Session
 
 from dobby_app.command_calendar import create_from_text, upcoming
@@ -8,31 +10,28 @@ from dobby_app.config import settings
 from dobby_app.runtime_status import current_commit
 from dobby_app.wiki_memory import handle_memory_command
 
+CommandHandler = Callable[[Session, str], str]
+
+
+COMMAND_HANDLERS: dict[str, CommandHandler] = {
+    "/status": lambda session, rest: status(),
+    "/memory": lambda session, rest: handle_memory_command(rest),
+    "/jobs": lambda session, rest: list_jobs(session),
+    "/queue": lambda session, rest: queue_status(session),
+    "/today": lambda session, rest: upcoming(days=1),
+    "/upcoming": lambda session, rest: upcoming(days=14),
+    "/remind": lambda session, rest: create_from_text(session, rest, item_type="reminder"),
+    "/event": lambda session, rest: create_from_text(session, rest, item_type="event"),
+    "/job": lambda session, rest: handle_job_command(session, rest),
+}
+
 
 def handle_command(session: Session, text: str) -> str:
     parts = text.strip().split(maxsplit=2)
     command = parts[0].lower()
     rest = text[len(parts[0]) :].strip()
-
-    if command == "/status":
-        return status()
-    if command == "/memory":
-        return handle_memory_command(rest)
-    if command == "/jobs":
-        return list_jobs(session)
-    if command == "/queue":
-        return queue_status(session)
-    if command == "/today":
-        return upcoming(days=1)
-    if command == "/upcoming":
-        return upcoming(days=14)
-    if command == "/remind":
-        return create_from_text(session, rest, item_type="reminder")
-    if command == "/event":
-        return create_from_text(session, rest, item_type="event")
-    if command == "/job":
-        return handle_job_command(session, rest)
-    return "Unknown command."
+    handler = COMMAND_HANDLERS.get(command)
+    return handler(session, rest) if handler else "Unknown command."
 
 
 def status() -> str:
