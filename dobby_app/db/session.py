@@ -40,6 +40,7 @@ def init_db() -> None:
 def _ensure_lightweight_schema_updates() -> None:
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
+    datetime_type = "TIMESTAMP WITH TIME ZONE" if engine.dialect.name == "postgresql" else "DATETIME"
     with engine.begin() as connection:
         if "telegram_messages" in tables:
             existing = {column["name"] for column in inspector.get_columns("telegram_messages")}
@@ -48,8 +49,8 @@ def _ensure_lightweight_schema_updates() -> None:
                 "reply_to_text": "TEXT",
                 "reply_to_kind": "VARCHAR(32)",
                 "planner_batch_id": "VARCHAR(64)",
-                "planner_processing_started_at": "DATETIME",
-                "planner_processed_at": "DATETIME",
+                "planner_processing_started_at": datetime_type,
+                "planner_processed_at": datetime_type,
             }
             for column, column_type in additions.items():
                 if column not in existing:
