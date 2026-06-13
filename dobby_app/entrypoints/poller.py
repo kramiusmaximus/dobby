@@ -6,11 +6,10 @@ import logging
 from aiogram import Bot
 from aiogram.types import Update
 
-from dobby_app.services.telegram_bot_commands import register_bot_commands
 from dobby_app.config.settings import settings
 from dobby_app.db.session import init_db, session_scope
 from dobby_app.config.logging import configure_logging
-from dobby_app.services.telegram_messages import reply_to_message
+from dobby_app.services.messages import register_bot_commands, reply_to_message
 from dobby_app.utils.runtime_status import format_startup_message, runtime_status
 from dobby_app.workflows.job_seed import seed_default_jobs
 from dobby_app.integrations.telegram import send_telegram_message

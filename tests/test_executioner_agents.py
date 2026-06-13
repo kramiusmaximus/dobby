@@ -4,9 +4,9 @@ import asyncio
 from types import SimpleNamespace
 
 from dobby_app.assistant.router import PlannedAction
-from dobby_app.assistant.tools.calendar import execute_calendar_action
-from dobby_app.assistant.tools.message import execute_message_action
 from dobby_app.assistant.tools.memory import execute_memory_action
+from dobby_app.assistant.tools.calendar_reminders import execute_calendar_action
+from dobby_app.assistant.tools.messaging import execute_message_action
 
 
 class FakeResponses:
@@ -92,8 +92,8 @@ def test_memory_executioner_calls_raw_write_wrapper(monkeypatch):
             calls.append((path, content))
             return "ok"
 
-    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.services.memory.client.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.client.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
         execute_memory_action(
@@ -144,8 +144,8 @@ def test_memory_executioner_answers_memory_query_with_obsidian_tool_loop(monkeyp
             assert path == "index.md"
             return "# Index\n\n- [[Studio Project]]"
 
-    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.services.memory.client.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.client.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
         execute_memory_action(
@@ -196,7 +196,7 @@ def test_calendar_executioner_calls_create_wrapper(monkeypatch):
     _patch_openai(monkeypatch, responses)
 
     monkeypatch.setattr(
-        "dobby_app.assistant.tools.calendar_schemas.create_execution_calendar_item",
+        "dobby_app.assistant.tools.calendar_reminders.functions.create_execution_calendar_item",
         lambda title, starts_at, item_type, alarm_minutes_before, duration_minutes, calendar_name: (
             f"Created {item_type}: {title} at parsed."
         ),
@@ -231,7 +231,7 @@ def test_calendar_delete_calls_delete_wrapper(monkeypatch):
     _patch_openai(monkeypatch, responses)
     calls = []
     monkeypatch.setattr(
-        "dobby_app.assistant.tools.calendar_schemas.delete_execution_calendar_item",
+        "dobby_app.assistant.tools.calendar_reminders.functions.delete_execution_calendar_item",
         lambda **kwargs: calls.append(kwargs),
     )
 

@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 
 from dobby_app.assistant.execution_results import ToolExecutionResult, ToolStatus
-from dobby_app.assistant.tools.calendar import execute_calendar_action
-from dobby_app.assistant.tools.message import execute_message_action
+from dobby_app.assistant.tools.calendar_reminders import execute_calendar_action
+from dobby_app.assistant.tools.jobs import execute_jobs_action
 from dobby_app.assistant.tools.memory import execute_memory_action
+from dobby_app.assistant.tools.messaging import execute_message_action
 from dobby_app.assistant.llm_logging import planned_action_for_log, result_for_log, truncate_for_log
 from dobby_app.assistant.router import ConversationMessage, PlannedAction
 
@@ -33,6 +34,10 @@ async def execute_tool_action(
         return result
     if action.tool == "memory":
         result = await execute_memory_action(action, latest_text, conversation_context)
+        logger.info("Executor action completed: result=%s", result_for_log(result))
+        return result
+    if action.tool == "jobs":
+        result = await execute_jobs_action(action, latest_text, conversation_context)
         logger.info("Executor action completed: result=%s", result_for_log(result))
         return result
     result = ToolExecutionResult(

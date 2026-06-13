@@ -60,7 +60,7 @@ VPS: SBXCTYO-EJ2ZWDQ-EJ6OCKK-KSACMFL-6WXN752-2W2KNMA-HVDXKVB-DXXA4AB
 
 Syncthing is configured as send/receive on both sides with permissions ignored for macOS/Linux compatibility. The current connection works through a Syncthing relay. For a direct connection, open TCP and UDP `22000` to the VPS in the provider firewall. The Syncthing GUI should stay bound to localhost; use an SSH tunnel if remote GUI access is needed.
 
-Detailed memory structure, memory policy, and assistant filing behavior live in `dobby_app/context/planner.md`.
+Detailed memory structure, memory policy, and assistant filing behavior live in `dobby_app/assistant/context/planner.md`.
 
 ## Telegram Commands
 
@@ -232,10 +232,10 @@ Back up PostgreSQL plus those folders daily.
 
 DOBBY's backend LLM behavior is guided by external Markdown templates:
 
-- `dobby_app/context/planner.md`: planner policy for choosing `message`, `calendar`, and `memory` actions.
-- `dobby_app/context/tools/message.md`: message executioner prompt and tool contract.
-- `dobby_app/context/tools/memory.md`: memory executioner prompt and tool contract.
-- `dobby_app/context/tools/calendar.md`: calendar executioner prompt and tool contract.
+- `dobby_app/assistant/context/planner.md`: planner policy for choosing `message`, `calendar`, and `memory` actions.
+- `dobby_app/assistant/context/tools/message.md`: message executioner prompt and tool contract.
+- `dobby_app/assistant/context/tools/memory.md`: memory executioner prompt and tool contract.
+- `dobby_app/assistant/context/tools/calendar.md`: calendar executioner prompt and tool contract.
 
 Prefer updating these templates when changing natural-language assistant behavior. Keep Python responsible for validation, persistence, safe mutation, and integration boundaries.
 

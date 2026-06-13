@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 
-CONTEXT_DIR = Path(__file__).resolve().parent.parent / "context"
+CONTEXT_DIR = Path(__file__).resolve().parent / "context"
 
 
 @lru_cache(maxsize=16)

@@ -37,7 +37,7 @@ class ScheduledJob(Base):
     schedule_text: Mapped[str] = mapped_column(String(200))
     cron: Mapped[dict] = mapped_column(JSON, default=dict)
     prompt: Mapped[str] = mapped_column(Text, default="")
-    job_type: Mapped[str] = mapped_column(String(64), default="generic")
+    job_type: Mapped[str] = mapped_column(String(64), default="planner_prompt")
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

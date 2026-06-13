@@ -5,7 +5,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from dobby_app.workflows.daily_briefing import daily_briefing
+from dobby_app.assistant.planner_runner import handle_plain_text_result
 from dobby_app.db.session import SessionLocal
 from dobby_app.db.models import JobRun, ScheduledJob
 from dobby_app.integrations.telegram import send_telegram_message
@@ -51,28 +51,25 @@ def _mark_run_failed(job_run_id: int, error: str) -> None:
 
 
 def _execute_job(job: ScheduledJob) -> dict:
-    if job.job_type == "daily_briefing":
-        return asyncio.run(_daily_briefing())
-    if job.job_type == "memory_maintenance":
-        return asyncio.run(_memory_maintenance())
-    if job.job_type == "telegram_reconciliation":
-        return asyncio.run(_telegram_reconciliation())
-    return asyncio.run(send_telegram_message(f"Ran job: {job.display_name}")) or {"ok": True}
+    prompt = (job.prompt or "").strip()
+    if not prompt:
+        raise RuntimeError(f"Scheduled job has no planner prompt: {job.name}")
+    return asyncio.run(_execute_planner_prompt_job(job, prompt))
 
 
-async def _daily_briefing() -> dict:
-    return await daily_briefing()
-
-
-async def _memory_maintenance() -> dict:
-    await send_telegram_message(
-        "Memory maintenance job is queued. Automated linting is scaffolded; full memory editing should run through DOBBY's maintenance worker."
-    )
-    return {"sent": True}
-
-
-async def _telegram_reconciliation() -> dict:
-    return {"sent": False, "skipped": True}
+async def _execute_planner_prompt_job(job: ScheduledJob, prompt: str) -> dict:
+    response = await handle_plain_text_result(prompt, conversation_context=None)
+    result = {
+        "job_name": job.name,
+        "job_type": job.job_type,
+        "sent": False,
+        "response_text": response.text,
+        "reaction_emoji": response.reaction_emoji,
+    }
+    if response.text and response.text.strip():
+        await send_telegram_message(response.text)
+        result["sent"] = True
+    return result
 
 
 def enqueue_job(session: Session, job: ScheduledJob) -> JobRun:

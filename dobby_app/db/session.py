@@ -40,19 +40,17 @@ def init_db() -> None:
 def _ensure_lightweight_schema_updates() -> None:
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
-    if "telegram_messages" not in tables:
-        return
-
-    existing = {column["name"] for column in inspector.get_columns("telegram_messages")}
-    additions = {
-        "reply_to_message_id": "INTEGER",
-        "reply_to_text": "TEXT",
-        "reply_to_kind": "VARCHAR(32)",
-    }
     with engine.begin() as connection:
-        for column, column_type in additions.items():
-            if column not in existing:
-                connection.execute(text(f"ALTER TABLE telegram_messages ADD COLUMN {column} {column_type}"))
+        if "telegram_messages" in tables:
+            existing = {column["name"] for column in inspector.get_columns("telegram_messages")}
+            additions = {
+                "reply_to_message_id": "INTEGER",
+                "reply_to_text": "TEXT",
+                "reply_to_kind": "VARCHAR(32)",
+            }
+            for column, column_type in additions.items():
+                if column not in existing:
+                    connection.execute(text(f"ALTER TABLE telegram_messages ADD COLUMN {column} {column_type}"))
 
         if "caldav_items" in tables:
             caldav_columns = {column["name"] for column in inspector.get_columns("caldav_items")}
@@ -65,8 +63,41 @@ def _ensure_lightweight_schema_updates() -> None:
                 )
 
         if "scheduled_jobs" in tables:
+            from dobby_app.services.jobs import (
+                DEFAULT_JOB_PROMPTS,
+                PLANNER_PROMPT_JOB_TYPE,
+                planner_prompt_for_seed,
+            )
+
             old_job_type = "wi" + "ki_maintenance"
             connection.execute(
                 text("UPDATE scheduled_jobs SET job_type = 'memory_maintenance' WHERE job_type = :old_job_type"),
                 {"old_job_type": old_job_type},
+            )
+            for name, prompt in DEFAULT_JOB_PROMPTS.items():
+                connection.execute(
+                    text(
+                        "UPDATE scheduled_jobs "
+                        "SET prompt = :prompt "
+                        "WHERE name = :name AND (prompt IS NULL OR trim(prompt) = '')"
+                    ),
+                    {"name": name, "prompt": planner_prompt_for_seed(name, prompt)},
+                )
+            empty_prompt_rows = connection.execute(
+                text("SELECT name FROM scheduled_jobs WHERE prompt IS NULL OR trim(prompt) = ''")
+            ).fetchall()
+            for row in empty_prompt_rows:
+                name = row[0]
+                connection.execute(
+                    text("UPDATE scheduled_jobs SET prompt = :prompt WHERE name = :name"),
+                    {"name": name, "prompt": planner_prompt_for_seed(name, None)},
+                )
+            connection.execute(
+                text(
+                    "UPDATE scheduled_jobs "
+                    "SET job_type = :job_type "
+                    "WHERE job_type IN ('daily_briefing', 'memory_maintenance', 'telegram_reconciliation', 'generic') "
+                    "OR job_type IS NULL OR trim(job_type) = ''"
+                ),
+                {"job_type": PLANNER_PROMPT_JOB_TYPE},
             )

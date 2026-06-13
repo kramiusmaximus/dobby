@@ -1,56 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from sqlalchemy.orm import Session
-
-from dobby_app.integrations.caldav import create_calendar_item, delete_calendar_item, list_items, update_calendar_item
-from dobby_app.db.session import session_scope
+from dobby_app.db.models import CaldavItem
 from dobby_app.db.repositories.calendar_items import (
     stored_alarm_minutes_before,
     try_delete_caldav_record,
     try_update_caldav_record,
 )
-from dobby_app.db.models import CaldavItem
-from dobby_app.services.memory import sync_calendar_item_to_memory, sync_calendar_snapshot_to_memory
-
-
-def list_calendar_items_and_sync(
-    starts_at: datetime,
-    ends_at: datetime,
-    calendar_name: str | None = None,
-) -> list[dict]:
-    items = list_items(starts_at, ends_at, calendar_name=calendar_name)
-    sync_calendar_snapshot_to_memory(items)
-    return items
-
-
-def create_command_calendar_item(
-    session: Session,
-    *,
-    title: str,
-    starts_at: datetime,
-    item_type: str,
-) -> CaldavItem:
-    memory_page = sync_calendar_item_to_memory(title=title, starts_at=starts_at, item_type=item_type)
-    result = create_calendar_item(
-        title=title,
-        starts_at=starts_at,
-        item_type=item_type,
-        alarm_minutes_before=0 if item_type == "reminder" else None,
-    )
-    item = CaldavItem(
-        uid=result.uid,
-        calendar_url=result.url,
-        title=title,
-        item_type=item_type,
-        starts_at=starts_at,
-        ends_at=starts_at + timedelta(minutes=15),
-        alarm_minutes_before=0 if item_type == "reminder" else None,
-        memory_page=memory_page,
-    )
-    session.add(item)
-    return item
+from dobby_app.db.session import session_scope
+from dobby_app.integrations.caldav import create_calendar_item, delete_calendar_item, update_calendar_item
 
 
 def create_execution_calendar_item(

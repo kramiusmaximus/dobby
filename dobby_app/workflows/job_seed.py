@@ -12,13 +12,8 @@ from sqlalchemy.orm import Session
 
 from dobby_app.config.settings import settings
 from dobby_app.db.models import ScheduledJob
+from dobby_app.services.jobs import PLANNER_PROMPT_JOB_TYPE, planner_prompt_for_seed
 from dobby_app.utils.schedules import rrule_to_cron
-
-
-JOB_TYPES = {
-    "daily-telegram-message": "daily_briefing",
-    "dobby-memory-maintenance": "memory_maintenance",
-}
 
 
 def seed_default_jobs(session: Session) -> None:
@@ -40,8 +35,8 @@ def seed_default_jobs(session: Session) -> None:
                 enabled=data.get("status", "ACTIVE") == "ACTIVE",
                 schedule_text=parsed.schedule_text,
                 cron=parsed.cron,
-                prompt=data.get("prompt", ""),
-                job_type=JOB_TYPES.get(name, "generic"),
+                prompt=planner_prompt_for_seed(name, data.get("prompt")),
+                job_type=PLANNER_PROMPT_JOB_TYPE,
                 updated_at=datetime.utcnow(),
             )
         )

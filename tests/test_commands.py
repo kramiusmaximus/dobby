@@ -15,7 +15,7 @@ def _add_job(sqlite_session, *, enabled: bool = True) -> ScheduledJob:
         schedule_text="every day at 9:00",
         cron={"hour": 9, "minute": 0},
         prompt="Brief Mark",
-        job_type="daily_briefing",
+        job_type="planner_prompt",
     )
     sqlite_session.add(job)
     sqlite_session.flush()
@@ -75,8 +75,9 @@ def test_memory_save_updates_obsidian_memory(monkeypatch, sqlite_session):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.commands.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.commands.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.markdown.get_obsidian_client", lambda: client)
 
     response = handle_command(sqlite_session, "/memory save Mark prefers concise Telegram acknowledgements")
 
@@ -108,8 +109,11 @@ def test_today_lists_one_day_of_calendar_items(monkeypatch, sqlite_session):
         captured["days"] = (end - start).days
         return [{"summary": "Dentist", "start": datetime(2026, 6, 8, 9, 0)}]
 
-    monkeypatch.setattr("dobby_app.services.calendar.list_items", fake_list_items)
-    monkeypatch.setattr("dobby_app.services.calendar.sync_calendar_snapshot_to_memory", lambda items: synced.extend(items))
+    monkeypatch.setattr("dobby_app.services.calendar.sync.list_items", fake_list_items)
+    monkeypatch.setattr(
+        "dobby_app.services.calendar.sync.sync_calendar_snapshot_to_memory",
+        lambda items: synced.extend(items),
+    )
 
     response = handle_command(sqlite_session, "/today")
 
@@ -126,8 +130,11 @@ def test_upcoming_lists_fourteen_days_of_calendar_items(monkeypatch, sqlite_sess
         captured["days"] = (end - start).days
         return [{"summary": "Studio", "start": datetime(2026, 6, 12, 15, 0)}]
 
-    monkeypatch.setattr("dobby_app.services.calendar.list_items", fake_list_items)
-    monkeypatch.setattr("dobby_app.services.calendar.sync_calendar_snapshot_to_memory", lambda items: synced.extend(items))
+    monkeypatch.setattr("dobby_app.services.calendar.sync.list_items", fake_list_items)
+    monkeypatch.setattr(
+        "dobby_app.services.calendar.sync.sync_calendar_snapshot_to_memory",
+        lambda items: synced.extend(items),
+    )
 
     response = handle_command(sqlite_session, "/upcoming")
 
@@ -143,7 +150,7 @@ def test_remind_creates_calendar_reminder(monkeypatch, sqlite_session):
 
     monkeypatch.setattr("dobby_app.commands.calendar.parse_datetime", lambda text: starts_at)
     monkeypatch.setattr(
-        "dobby_app.services.calendar.sync_calendar_item_to_memory",
+        "dobby_app.services.calendar.commands.sync_calendar_item_to_memory",
         lambda **kwargs: calls.append(("memory", kwargs)) or "pages/calendar/june-2026-commitments.md",
     )
 
@@ -152,7 +159,7 @@ def test_remind_creates_calendar_reminder(monkeypatch, sqlite_session):
         created.update(kwargs)
         return CalendarWriteResult(uid="reminder-uid", url="caldav://reminder")
 
-    monkeypatch.setattr("dobby_app.services.calendar.create_calendar_item", fake_create_calendar_item)
+    monkeypatch.setattr("dobby_app.services.calendar.commands.create_calendar_item", fake_create_calendar_item)
 
     response = handle_command(sqlite_session, "/remind Call dentist at tomorrow 9")
 
@@ -172,7 +179,7 @@ def test_event_creates_calendar_event(monkeypatch, sqlite_session):
 
     monkeypatch.setattr("dobby_app.commands.calendar.parse_datetime", lambda text: starts_at)
     monkeypatch.setattr(
-        "dobby_app.services.calendar.sync_calendar_item_to_memory",
+        "dobby_app.services.calendar.commands.sync_calendar_item_to_memory",
         lambda **kwargs: calls.append(("memory", kwargs)) or "pages/calendar/june-2026-commitments.md",
     )
 
@@ -181,7 +188,7 @@ def test_event_creates_calendar_event(monkeypatch, sqlite_session):
         created.update(kwargs)
         return CalendarWriteResult(uid="event-uid", url="caldav://event")
 
-    monkeypatch.setattr("dobby_app.services.calendar.create_calendar_item", fake_create_calendar_item)
+    monkeypatch.setattr("dobby_app.services.calendar.commands.create_calendar_item", fake_create_calendar_item)
 
     response = handle_command(sqlite_session, "/event Studio visit at Friday 15:00")
 
@@ -201,20 +208,109 @@ def test_job_show_displays_job_config(sqlite_session):
 
     assert "Daily Briefing" in response
     assert "name: daily-briefing" in response
-    assert "type: daily_briefing" in response
+    assert "type: planner_prompt" in response
+    assert "prompt: Brief Mark" in response
+
+
+def test_job_create_adds_planner_prompt_job(sqlite_session):
+    response = handle_command(
+        sqlite_session,
+        '/job create name=morning-check schedule="every day at 9:00" prompt="Check calendar and brief Mark" '
+        'display="Morning Check"',
+    )
+
+    job = sqlite_session.query(ScheduledJob).filter_by(name="morning-check").one()
+    assert response == "Created Morning Check."
+    assert job.schedule_text == "every day at 9:00"
+    assert job.prompt == "Check calendar and brief Mark"
+    assert job.job_type == "planner_prompt"
+
+
+def test_job_create_requires_fields(sqlite_session):
+    response = handle_command(sqlite_session, "/job create name=missing")
+
+    assert "Missing required job field(s): schedule, prompt." in response
+    assert "No jobs configured." == handle_command(sqlite_session, "/jobs")
+
+
+def test_job_create_rejects_duplicate_name(sqlite_session):
+    _add_job(sqlite_session)
+
+    try:
+        handle_command(
+            sqlite_session,
+            '/job create name=daily-briefing schedule="every day at 9:00" prompt="Brief Mark"',
+        )
+    except ValueError as exc:
+        assert "Job already exists: daily-briefing" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate job error")
+
+
+def test_job_update_changes_prompt_and_schedule(sqlite_session):
+    job = _add_job(sqlite_session)
+
+    response = handle_command(
+        sqlite_session,
+        '/job update daily-briefing schedule="every 2 hours" prompt="Send a compact briefing" enabled=false',
+    )
+
+    assert response == "Updated Daily Briefing."
+    assert job.schedule_text == "every 2 hours"
+    assert job.cron == {"hour": "*/2", "minute": 0}
+    assert job.prompt == "Send a compact briefing"
+    assert job.enabled is False
+
+
+def test_job_update_requires_fields(sqlite_session):
+    _add_job(sqlite_session)
+
+    response = handle_command(sqlite_session, "/job update daily-briefing")
+
+    assert "Missing fields to update." in response
+
+
+def test_job_delete_removes_exact_match(sqlite_session):
+    _add_job(sqlite_session)
+
+    response = handle_command(sqlite_session, "/job delete daily-briefing")
+
+    assert response == "Deleted Daily Briefing."
+    assert sqlite_session.query(ScheduledJob).count() == 0
+
+
+def test_job_delete_ambiguous_requires_exact_name(sqlite_session):
+    _add_job(sqlite_session)
+    sqlite_session.add(
+        ScheduledJob(
+            name="daily-review",
+            display_name="Daily Review",
+            enabled=True,
+            schedule_text="every day at 10:00",
+            cron={"hour": 10, "minute": 0},
+            prompt="Review Mark's day",
+            job_type="planner_prompt",
+        )
+    )
+    sqlite_session.flush()
+
+    response = handle_command(sqlite_session, "/job delete daily")
+
+    assert "Job name is ambiguous. Use an exact name:" in response
+    assert sqlite_session.query(ScheduledJob).count() == 2
 
 
 def test_job_run_enqueues_job(monkeypatch, sqlite_session):
     job = _add_job(sqlite_session)
 
-    def fake_enqueue_job(session, queued_job):
-        assert queued_job.id == job.id
-        run = JobRun(scheduled_job_id=queued_job.id, status="queued")
+    def fake_enqueue_named_job(session, name):
+        assert name == job.name
+        run = JobRun(scheduled_job_id=job.id, status="queued")
         session.add(run)
         session.flush()
         return run
 
-    monkeypatch.setattr("dobby_app.commands.jobs.enqueue_job", fake_enqueue_job)
+    monkeypatch.setattr("dobby_app.commands.jobs.enqueue_named_job", fake_enqueue_named_job)
 
     response = handle_command(sqlite_session, "/job run daily-briefing")
 
@@ -255,13 +351,14 @@ def test_job_retry_enqueues_original_job(monkeypatch, sqlite_session):
     sqlite_session.add(failed_run)
     sqlite_session.flush()
 
-    def fake_enqueue_job(session, queued_job):
-        run = JobRun(scheduled_job_id=queued_job.id, status="queued")
+    def fake_retry_job_run(session, run_id):
+        assert run_id == failed_run.id
+        run = JobRun(scheduled_job_id=job.id, status="queued")
         session.add(run)
         session.flush()
-        return run
+        return job, run
 
-    monkeypatch.setattr("dobby_app.commands.jobs.enqueue_job", fake_enqueue_job)
+    monkeypatch.setattr("dobby_app.commands.jobs.retry_job_run", fake_retry_job_run)
 
     response = handle_command(sqlite_session, f"/job retry {failed_run.id}")
 

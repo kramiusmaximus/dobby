@@ -4,77 +4,107 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from dobby_app.db.repositories.jobs import find_scheduled_job, list_scheduled_jobs, recent_job_runs
-from dobby_app.workflows.jobs import enqueue_job
-from dobby_app.db.models import JobRun, ScheduledJob
+from dobby_app.services.jobs import (
+    PLANNER_PROMPT_JOB_TYPE,
+    create_job,
+    delete_job,
+    enqueue_named_job,
+    find_job,
+    list_jobs_text,
+    parse_job_fields,
+    queue_status_text,
+    retry_job_run,
+    show_job_text,
+    update_job,
+)
 from dobby_app.utils.schedules import parse_schedule
 
 
 def list_jobs(session: Session) -> str:
-    jobs = list_scheduled_jobs(session)
-    if not jobs:
-        return "No jobs configured."
-    lines = ["Jobs:"]
-    for job in jobs:
-        status = "active" if job.enabled else "paused"
-        lines.append(f"- {job.name}: {status}, {job.schedule_text}, next {job.next_run_at or 'pending'}")
-    return "\n".join(lines)
+    return list_jobs_text(session)
 
 
 def queue_status(session: Session) -> str:
-    runs = recent_job_runs(session)
-    if not runs:
-        return "Queue is empty."
-    lines = ["Recent queue runs:"]
-    for run in runs:
-        lines.append(f"- #{run.id}: {run.status}" + (f" — {run.error}" if run.error else ""))
-    return "\n".join(lines)
+    return queue_status_text(session)
 
 
 def handle_job_command(session: Session, rest: str) -> str:
     action, _, remainder = rest.partition(" ")
     action = action.lower()
 
+    if not action or action == "list":
+        return list_jobs(session)
     if action == "show":
         job = find_job(session, remainder)
-        return (
-            f"{job.display_name}\n"
-            f"name: {job.name}\n"
-            f"status: {'active' if job.enabled else 'paused'}\n"
-            f"schedule: {job.schedule_text}\n"
-            f"type: {job.job_type}\n"
-            f"last run: {job.last_run_at or 'never'}\n"
-            f"next run: {job.next_run_at or 'pending'}"
+        return show_job_text(job)
+    if action == "create":
+        fields = parse_job_fields(remainder)
+        missing = [field for field in ("name", "schedule", "prompt") if not fields.get(field)]
+        if missing:
+            return (
+                f"Missing required job field(s): {', '.join(missing)}.\n"
+                'Use: /job create name=<slug> schedule="<schedule>" prompt="<prompt>" '
+                '[display="<display name>"] [enabled=true|false]'
+            )
+        job = create_job(
+            session,
+            name=fields["name"],
+            schedule_text=fields["schedule"],
+            prompt=fields["prompt"],
+            display_name=fields.get("display_name"),
+            enabled=fields.get("enabled", True),
         )
+        return f"Created {job.display_name}."
+    if action == "update":
+        name, _, field_text = remainder.partition(" ")
+        if not name.strip():
+            return (
+                "Missing job name.\n"
+                'Use: /job update <name> [name=<new-slug>] [display="<display name>"] '
+                '[schedule="<schedule>"] [prompt="<prompt>"] [enabled=true|false]'
+            )
+        fields = parse_job_fields(field_text)
+        if not fields:
+            return (
+                "Missing fields to update.\n"
+                'Use: /job update <name> [name=<new-slug>] [display="<display name>"] '
+                '[schedule="<schedule>"] [prompt="<prompt>"] [enabled=true|false]'
+            )
+        job = update_job(
+            session,
+            find_job(session, name),
+            name=fields.get("name"),
+            schedule_text=fields.get("schedule"),
+            prompt=fields.get("prompt"),
+            display_name=fields.get("display_name"),
+            enabled=fields.get("enabled"),
+        )
+        return f"Updated {job.display_name}."
+    if action == "delete":
+        if not remainder.strip():
+            return "Missing job name. Use: /job delete <exact-name>"
+        return delete_job(session, remainder)
     if action == "run":
         job = find_job(session, remainder)
-        run = enqueue_job(session, job)
+        run = enqueue_named_job(session, remainder)
         return f"Queued {job.display_name} as run #{run.id}."
     if action in {"pause", "resume"}:
         job = find_job(session, remainder)
         job.enabled = action == "resume"
+        job.job_type = PLANNER_PROMPT_JOB_TYPE
         job.updated_at = datetime.utcnow()
         return f"{'Resumed' if job.enabled else 'Paused'} {job.display_name}."
     if action == "schedule":
         name, _, schedule_text = remainder.partition(" ")
         job = find_job(session, name)
         parsed = parse_schedule(schedule_text)
-        job.schedule_text = parsed.schedule_text
-        job.cron = parsed.cron
-        job.updated_at = datetime.utcnow()
+        update_job(session, job, schedule_text=parsed.schedule_text)
         return f"Updated {job.display_name} schedule to: {job.schedule_text}."
     if action == "retry":
-        run = session.get(JobRun, int(remainder.strip()))
-        if not run or not run.scheduled_job_id:
-            return "Could not find a retryable job run."
-        job = session.get(ScheduledJob, run.scheduled_job_id)
-        if not job:
+        retried = retry_job_run(session, int(remainder.strip()))
+        if not retried:
             return "Could not find the original scheduled job."
-        new_run = enqueue_job(session, job)
+        job, new_run = retried
         return f"Retried {job.display_name} as run #{new_run.id}."
 
-    return "Use /job show|run|pause|resume|schedule|retry."
-
-
-def find_job(session: Session, name: str) -> ScheduledJob:
-    return find_scheduled_job(session, name)
+    return "Use /job list|show|create|update|delete|run|pause|resume|schedule|retry."

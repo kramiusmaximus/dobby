@@ -32,8 +32,9 @@ def test_calendar_sync_writes_through_obsidian(monkeypatch):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.calendar_sync.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.calendar_sync.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.markdown.get_obsidian_client", lambda: client)
 
     rel_path = sync_calendar_item_to_memory(
         title="Studio visit",
@@ -73,8 +74,9 @@ def test_update_memory_line_replaces_one_exact_line(monkeypatch):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.line_edits.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.line_edits.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.markdown.get_obsidian_client", lambda: client)
 
     response = update_memory_line(
         path="pages/goals/example.md",
@@ -107,8 +109,9 @@ def test_delete_memory_line_removes_one_exact_line(monkeypatch):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.line_edits.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.line_edits.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.markdown.get_obsidian_client", lambda: client)
 
     response = delete_memory_line(
         path="pages/goals/example.md",
@@ -141,8 +144,9 @@ def test_delete_memory_line_succeeds_when_log_append_404s(monkeypatch):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.line_edits.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.line_edits.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory.markdown.get_obsidian_client", lambda: client)
 
     response = delete_memory_line(
         path="pages/goals/example.md",
@@ -159,8 +163,11 @@ def test_delete_memory_line_refuses_ambiguous_line(monkeypatch):
         def read(self, path):
             return "# Note\n\n- Duplicate\n- Duplicate\n"
 
-    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.services.memory.line_edits.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr(
+        "dobby_app.services.memory.line_edits.get_obsidian_client",
+        lambda: FakeObsidianClient(),
+    )
 
     with pytest.raises(ValueError, match="appears more than once"):
         delete_memory_line(path="pages/goals/example.md", exact_line="- Duplicate")

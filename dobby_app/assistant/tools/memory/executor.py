@@ -3,7 +3,7 @@ from __future__ import annotations
 from dobby_app.assistant.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.assistant.executioner_agent import ExecutionTool, run_executioner_agent
 from dobby_app.assistant.tools.common import needs_clarification_schema
-from dobby_app.assistant.tools.memory_schemas import (
+from dobby_app.assistant.tools.memory.functions import (
     obsidian_active_file_path,
     obsidian_active_file_path_schema,
     obsidian_append,

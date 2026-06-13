@@ -8,7 +8,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from dobby_app.config.settings import settings
-from dobby_app.utils.context_templates import load_context_template
+from dobby_app.assistant.context_templates import load_context_template
 from dobby_app.integrations.openai import create_response
 from dobby_app.assistant.llm_logging import action_plan_for_log, truncate_for_log
 
@@ -47,10 +47,21 @@ ACTION_PLAN_SCHEMA = {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "tool": {"type": "string", "enum": ["message", "calendar", "memory"]},
+                        "tool": {"type": "string", "enum": ["message", "calendar", "memory", "jobs"]},
                         "operation": {
                             "type": ["string", "null"],
-                            "enum": ["create", "read", "update", "delete", "send", "none", None],
+                            "enum": [
+                                "create",
+                                "read",
+                                "update",
+                                "delete",
+                                "send",
+                                "run",
+                                "pause",
+                                "resume",
+                                "none",
+                                None,
+                            ],
                         },
                         "reason": {"type": ["string", "null"]},
                         "arguments": {
@@ -68,6 +79,12 @@ ACTION_PLAN_SCHEMA = {
                                 "path": {"type": ["string", "null"]},
                                 "exact_line": {"type": ["string", "null"]},
                                 "replacement": {"type": ["string", "null"]},
+                                "name": {"type": ["string", "null"]},
+                                "display_name": {"type": ["string", "null"]},
+                                "schedule": {"type": ["string", "null"]},
+                                "prompt": {"type": ["string", "null"]},
+                                "enabled": {"type": ["boolean", "null"]},
+                                "run_id": {"type": ["integer", "null"]},
                             },
                             "required": [
                                 "kind",
@@ -81,6 +98,12 @@ ACTION_PLAN_SCHEMA = {
                                 "path",
                                 "exact_line",
                                 "replacement",
+                                "name",
+                                "display_name",
+                                "schedule",
+                                "prompt",
+                                "enabled",
+                                "run_id",
                             ],
                         },
                     },

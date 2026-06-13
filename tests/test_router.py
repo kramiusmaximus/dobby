@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from dobby_app.utils.context_templates import load_context_template
+from dobby_app.assistant.context_templates import load_context_template
 from dobby_app.assistant.router import _planner_system_prompt, assistant_chat, plan_actions
 
 
@@ -28,6 +28,7 @@ def test_tool_contexts_document_executor_operations():
     message_context = load_context_template("tools/message.md")
     calendar_context = load_context_template("tools/calendar.md")
     memory_context = load_context_template("tools/memory.md")
+    jobs_context = load_context_template("tools/jobs.md")
 
     assert "Available tools" in message_context
     assert "Available tools" in calendar_context
@@ -36,6 +37,8 @@ def test_tool_contexts_document_executor_operations():
     assert "<b>important text</b>" in message_context
     assert "obsidian_write" in memory_context
     assert "Do not guess paths or targets." in memory_context
+    assert "runtime-defined scheduled jobs" in jobs_context
+    assert "jobs_create" in jobs_context
 
 
 def test_planner_uses_planner_model(monkeypatch):
@@ -50,7 +53,8 @@ def test_planner_uses_planner_model(monkeypatch):
                     '"reason": null, "arguments": {"kind": null, "title": null, "datetime": null, '
                     '"duration_minutes": null, "alarm_minutes_before": null, "days": null, '
                     '"query": null, "content": "Hi", "path": null, "exact_line": null, '
-                    '"replacement": null}}]}'
+                    '"replacement": null, "name": null, "display_name": null, "schedule": null, '
+                    '"prompt": null, "enabled": null, "run_id": null}}]}'
                 )
             )
 

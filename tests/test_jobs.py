@@ -1,87 +1,127 @@
 from __future__ import annotations
 
-import asyncio
-from datetime import timedelta
+from datetime import datetime
 
-from dobby_app.workflows.jobs import _daily_briefing, _telegram_reconciliation
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from dobby_app.assistant.planner_runner import HandlerResponse
+from dobby_app.db.models import JobRun, ScheduledJob
+from dobby_app.db.session import Base
+from dobby_app.workflows import jobs as job_workflow
+from dobby_app.workflows.jobs import _execute_job, run_scheduled_job
 
 
-def test_daily_briefing_sends_four_formatted_messages(monkeypatch):
+def test_execute_job_runs_stored_prompt_through_planner(monkeypatch):
     sent = []
     captured = {}
+    job = ScheduledJob(
+        name="daily-briefing",
+        display_name="Daily Briefing",
+        enabled=True,
+        schedule_text="every day at 9:00",
+        cron={"hour": 9, "minute": 0},
+        prompt="Brief Mark",
+        job_type="planner_prompt",
+    )
 
-    class FakeObsidianClient:
-        def list(self, path):
-            if path == "pages/goals":
-                return ["gift.md"]
-            return []
-
-        def read(self, path):
-            assert path == "pages/goals/gift.md"
-            return """---
-title: Gift
-type: goal
-created: 2026-06-08
-updated: 2026-06-08
-status: active
-tags: []
-sources: []
----
-
-# Gift
-
-## Goal
-
-Buy the present before the birthday.
-"""
-
-    def fake_list_items(start, end):
-        captured["start"] = start
-        captured["end"] = end
-        return [
-            {"summary": "Dentist", "start": start.replace(hour=9)},
-            {"summary": "Birthday", "start": start.date()},
-            {"summary": "Studio", "start": start + timedelta(days=3, hours=15)},
-        ]
+    async def fake_handle_plain_text_result(text, conversation_context=None):
+        captured["text"] = text
+        captured["conversation_context"] = conversation_context
+        return HandlerResponse(text="Here is the briefing.")
 
     async def fake_send_telegram_message(text):
         sent.append(text)
 
-    monkeypatch.setattr("dobby_app.workflows.daily_briefing.random.choice", lambda options: options[0])
-    monkeypatch.setattr("dobby_app.workflows.daily_briefing.list_items", fake_list_items)
-    monkeypatch.setattr("dobby_app.workflows.daily_briefing.send_telegram_message", fake_send_telegram_message)
-    monkeypatch.setattr("dobby_app.workflows.daily_briefing.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.workflows.daily_briefing.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr(job_workflow, "handle_plain_text_result", fake_handle_plain_text_result)
+    monkeypatch.setattr(job_workflow, "send_telegram_message", fake_send_telegram_message)
 
-    result = asyncio.run(_daily_briefing())
+    result = _execute_job(job)
 
-    assert result == {"sent": True, "upcoming_count": 3}
-    assert len(sent) == 4
-    assert sent[0].startswith("Start\n\n")
-    assert "Calendar and Reminders" in sent[1]
-    assert "Today\n- " in sent[1]
-    assert "Dentist" in sent[1]
-    assert "all day - Birthday" in sent[1]
-    assert "time unknown - Birthday" not in sent[1]
-    assert "Next 2 Weeks\n- " in sent[1]
-    assert "Studio" in sent[1]
-    assert sent[2].startswith("Other Important Reminders\n\n")
-    assert "Gift: Buy the present before the birthday." in sent[2]
-    assert sent[3] == "Today\n\nWhat do you plan to accomplish today?"
-    assert captured["start"].hour == 0
-    assert captured["start"].minute == 0
-    assert (captured["end"] - captured["start"]).days == 14
+    assert captured == {"text": "Brief Mark", "conversation_context": None}
+    assert sent == ["Here is the briefing."]
+    assert result == {
+        "job_name": "daily-briefing",
+        "job_type": "planner_prompt",
+        "sent": True,
+        "response_text": "Here is the briefing.",
+        "reaction_emoji": None,
+    }
 
 
-def test_telegram_reconciliation_job_is_silent(monkeypatch):
+def test_execute_job_does_not_send_reaction_only_response(monkeypatch):
     sent = []
+    job = ScheduledJob(
+        name="quiet-job",
+        display_name="Quiet Job",
+        enabled=True,
+        schedule_text="every day at 9:00",
+        cron={"hour": 9, "minute": 0},
+        prompt="Do quiet maintenance",
+        job_type="planner_prompt",
+    )
+
+    async def fake_handle_plain_text_result(text, conversation_context=None):
+        return HandlerResponse(reaction_emoji="👍")
 
     async def fake_send_telegram_message(text):
         sent.append(text)
 
-    monkeypatch.setattr("dobby_app.workflows.jobs.send_telegram_message", fake_send_telegram_message)
+    monkeypatch.setattr(job_workflow, "handle_plain_text_result", fake_handle_plain_text_result)
+    monkeypatch.setattr(job_workflow, "send_telegram_message", fake_send_telegram_message)
 
-    result = asyncio.run(_telegram_reconciliation())
+    result = _execute_job(job)
 
-    assert result == {"sent": False, "skipped": True}
     assert sent == []
+    assert result["sent"] is False
+    assert result["reaction_emoji"] == "👍"
+
+
+def test_execute_job_requires_prompt():
+    job = ScheduledJob(
+        name="empty-job",
+        display_name="Empty Job",
+        enabled=True,
+        schedule_text="every day at 9:00",
+        cron={"hour": 9, "minute": 0},
+        prompt="",
+        job_type="planner_prompt",
+    )
+
+    with pytest.raises(RuntimeError, match="has no planner prompt"):
+        _execute_job(job)
+
+
+def test_run_scheduled_job_marks_failed_runs(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    job = ScheduledJob(
+        name="failing-job",
+        display_name="Failing Job",
+        enabled=True,
+        schedule_text="every day at 9:00",
+        cron={"hour": 9, "minute": 0},
+        prompt="Fail",
+        job_type="planner_prompt",
+    )
+    session.add(job)
+    session.flush()
+    run = JobRun(scheduled_job_id=job.id, status="queued")
+    session.add(run)
+    session.commit()
+
+    monkeypatch.setattr(job_workflow, "SessionLocal", Session)
+    monkeypatch.setattr(job_workflow, "_execute_job", lambda job: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        run_scheduled_job(job.id, run.id)
+
+    session.expire_all()
+    refreshed = session.get(JobRun, run.id)
+    assert refreshed.status == "failed"
+    assert refreshed.error == "boom"
+    assert isinstance(refreshed.finished_at, datetime)
+    session.close()

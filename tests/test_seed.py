@@ -22,5 +22,6 @@ rrule = "RRULE:FREQ=WEEKLY;BYHOUR=9;BYMINUTE=0;BYDAY=SU,MO,TU,WE,TH,FR,SA"
     seed_default_jobs(sqlite_session)
     job = sqlite_session.query(ScheduledJob).one()
     assert job.name == "daily-telegram-message"
-    assert job.job_type == "daily_briefing"
+    assert job.job_type == "planner_prompt"
+    assert job.prompt == "send briefing"
     assert job.enabled is True
