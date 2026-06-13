@@ -33,16 +33,18 @@ jobs:
             cp "$DEPLOY_PATH/.env" /tmp/dobby.env
           fi
 
-          tar \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='.env' \
-            --exclude='memory' \
-            --exclude='.venv' \
-            --exclude='.pytest_cache' \
-            --exclude='.ruff_cache' \
-            --exclude='*.egg-info' \
-            -czf /tmp/dobby-release.tgz .
+          find . -mindepth 1 \
+            -path './.git' -prune -o \
+            -path './.github' -prune -o \
+            -path './memory' -prune -o \
+            -path './.venv' -prune -o \
+            -path './.pytest_cache' -prune -o \
+            -path './.ruff_cache' -prune -o \
+            -name '.env' -prune -o \
+            -name '*.egg-info' -prune -o \
+            -name '__pycache__' -prune -o \
+            \( -type f -o -type l \) -print \
+            | tar -czf /tmp/dobby-release.tgz -T -
 
           find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name .env ! -name memory ! -name obsidian-config -exec rm -rf {} +
           tar -xzf /tmp/dobby-release.tgz -C "$DEPLOY_PATH"
