@@ -53,8 +53,8 @@ def _mark_run_failed(job_run_id: int, error: str) -> None:
 def _execute_job(job: ScheduledJob) -> dict:
     if job.job_type == "daily_briefing":
         return asyncio.run(_daily_briefing())
-    if job.job_type == "wiki_maintenance":
-        return asyncio.run(_wiki_maintenance())
+    if job.job_type == "memory_maintenance":
+        return asyncio.run(_memory_maintenance())
     if job.job_type == "telegram_reconciliation":
         return asyncio.run(_telegram_reconciliation())
     return asyncio.run(send_telegram_message(f"Ran job: {job.display_name}")) or {"ok": True}
@@ -64,9 +64,9 @@ async def _daily_briefing() -> dict:
     return await daily_briefing()
 
 
-async def _wiki_maintenance() -> dict:
+async def _memory_maintenance() -> dict:
     await send_telegram_message(
-        "Wiki maintenance job is queued. Automated linting is scaffolded; full wiki editing should run through DOBBY's maintenance worker."
+        "Memory maintenance job is queued. Automated linting is scaffolded; full memory editing should run through DOBBY's maintenance worker."
     )
     return {"sent": True}
 

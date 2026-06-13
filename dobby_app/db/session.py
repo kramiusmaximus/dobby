@@ -39,7 +39,8 @@ def init_db() -> None:
 
 def _ensure_lightweight_schema_updates() -> None:
     inspector = inspect(engine)
-    if "telegram_messages" not in inspector.get_table_names():
+    tables = set(inspector.get_table_names())
+    if "telegram_messages" not in tables:
         return
 
     existing = {column["name"] for column in inspector.get_columns("telegram_messages")}
@@ -52,3 +53,20 @@ def _ensure_lightweight_schema_updates() -> None:
         for column, column_type in additions.items():
             if column not in existing:
                 connection.execute(text(f"ALTER TABLE telegram_messages ADD COLUMN {column} {column_type}"))
+
+        if "caldav_items" in tables:
+            caldav_columns = {column["name"] for column in inspector.get_columns("caldav_items")}
+            if "memory_page" not in caldav_columns:
+                connection.execute(text("ALTER TABLE caldav_items ADD COLUMN memory_page TEXT"))
+            old_column_name = "wi" + "ki_page"
+            if old_column_name in caldav_columns:
+                connection.execute(
+                    text(f"UPDATE caldav_items SET memory_page = {old_column_name} WHERE memory_page IS NULL")
+                )
+
+        if "scheduled_jobs" in tables:
+            old_job_type = "wi" + "ki_maintenance"
+            connection.execute(
+                text("UPDATE scheduled_jobs SET job_type = 'memory_maintenance' WHERE job_type = :old_job_type"),
+                {"old_job_type": old_job_type},
+            )

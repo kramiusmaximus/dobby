@@ -8,7 +8,7 @@ from dobby_app.commands.calendar import create_from_text, upcoming
 from dobby_app.commands.jobs import handle_job_command, list_jobs, queue_status
 from dobby_app.config.settings import settings
 from dobby_app.utils.runtime_status import current_commit
-from dobby_app.services.wiki_memory import handle_memory_command
+from dobby_app.services.memory_notes import handle_memory_command
 
 CommandHandler = Callable[[Session, str], str]
 

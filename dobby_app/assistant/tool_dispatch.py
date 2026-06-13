@@ -5,7 +5,7 @@ import logging
 from dobby_app.assistant.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.assistant.tools.calendar import execute_calendar_action
 from dobby_app.assistant.tools.message import execute_message_action
-from dobby_app.assistant.tools.wiki import execute_wiki_action
+from dobby_app.assistant.tools.memory import execute_memory_action
 from dobby_app.assistant.llm_logging import planned_action_for_log, result_for_log, truncate_for_log
 from dobby_app.assistant.router import ConversationMessage, PlannedAction
 
@@ -31,8 +31,8 @@ async def execute_tool_action(
         result = await execute_calendar_action(action, latest_text, conversation_context)
         logger.info("Executor action completed: result=%s", result_for_log(result))
         return result
-    if action.tool == "wiki":
-        result = await execute_wiki_action(action, latest_text, conversation_context)
+    if action.tool == "memory":
+        result = await execute_memory_action(action, latest_text, conversation_context)
         logger.info("Executor action completed: result=%s", result_for_log(result))
         return result
     result = ToolExecutionResult(

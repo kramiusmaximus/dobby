@@ -15,7 +15,7 @@ services:
       - "127.0.0.1:27123:27123"
     volumes:
       - ./obsidian-config:/config
-      - ./wiki:/config/dobby
+      - ./memory:/config/dobby
     shm_size: "1gb"
 
   app:
@@ -29,7 +29,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./wiki:/app/wiki
+      - ./memory:/app/memory
       - ./assets:/app/assets
       - ./storage/media:/app/storage/media
       - ./data:/app/data
@@ -43,7 +43,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./wiki:/app/wiki
+      - ./memory:/app/memory
       - ./assets:/app/assets
       - ./storage/media:/app/storage/media
       - ./data:/app/data
@@ -57,7 +57,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./wiki:/app/wiki
+      - ./memory:/app/memory
       - ./assets:/app/assets
       - ./storage/media:/app/storage/media
       - ./data:/app/data
@@ -71,7 +71,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./wiki:/app/wiki
+      - ./memory:/app/memory
       - ./data:/app/data
 
   postgres:

@@ -23,15 +23,15 @@ The bot no longer requires a public Telegram webhook. The poller disables any ex
 DOBBY's production vault lives at:
 
 ```text
-/opt/dobby/wiki
+/opt/dobby/memory
 ```
 
-The deployment workflow preserves `/opt/dobby/wiki` across releases. Runtime memory operations go through Obsidian Local REST API, backed by the synced vault.
+The deployment workflow preserves `/opt/dobby/memory` across releases. Runtime memory operations go through Obsidian Local REST API, backed by the synced vault.
 
 Local vault path:
 
 ```text
-wiki/
+memory/
 ```
 
 Local and VPS vaults are synced with Syncthing.
@@ -39,9 +39,9 @@ Local and VPS vaults are synced with Syncthing.
 Synced folder:
 
 ```text
-Folder ID: dobby-wiki
-Local path: /Users/kramiusmaximus/projects/dobby/wiki
-VPS path: /opt/dobby/wiki
+Folder ID: dobby-memory
+Local path: /Users/kramiusmaximus/projects/dobby/memory
+VPS path: /opt/dobby/memory
 ```
 
 Syncthing services:
@@ -60,7 +60,7 @@ VPS: SBXCTYO-EJ2ZWDQ-EJ6OCKK-KSACMFL-6WXN752-2W2KNMA-HVDXKVB-DXXA4AB
 
 Syncthing is configured as send/receive on both sides with permissions ignored for macOS/Linux compatibility. The current connection works through a Syncthing relay. For a direct connection, open TCP and UDP `22000` to the VPS in the provider firewall. The Syncthing GUI should stay bound to localhost; use an SSH tunnel if remote GUI access is needed.
 
-Detailed wiki structure, memory policy, and assistant filing behavior live in `dobby_app/context/planner.md`.
+Detailed memory structure, memory policy, and assistant filing behavior live in `dobby_app/context/planner.md`.
 
 ## Telegram Commands
 
@@ -117,7 +117,7 @@ PLANNER_REASONING_EFFORT
 EXECUTOR_MODEL
 EXECUTOR_REASONING_EFFORT
 TRANSCRIPTION_MODEL
-WIKI_MAINTENANCE_MODEL
+MEMORY_MAINTENANCE_MODEL
 DAILY_BRIEFING_MODEL
 ```
 
@@ -131,7 +131,7 @@ Telegram voice notes arrive as OGG/Opus files. The VPS app downloads voice files
 
 ## Obsidian API
 
-DOBBY memory queries and wiki writes use the Obsidian Local REST API plugin:
+DOBBY memory queries and memory writes use the Obsidian Local REST API plugin:
 
 ```env
 OBSIDIAN_API_URL=http://obsidian:27123
@@ -148,7 +148,7 @@ The `obsidian` Compose service uses `lscr.io/linuxserver/obsidian:latest`, publi
 
 DOBBY uses Obsidian as the source of truth for calendar and reminder context. iCloud Calendar over CalDAV is the production delivery and notification transport.
 
-Reminder and event requests sync the relevant Obsidian wiki calendar page through the Obsidian API before writing to CalDAV.
+Reminder and event requests sync the relevant Obsidian memory calendar page through the Obsidian API before writing to CalDAV.
 
 Current VPS configuration:
 
@@ -196,7 +196,7 @@ On a brand-new Obsidian profile, open the Obsidian GUI through an SSH tunnel to 
 Deployment runs on the VPS self-hosted runner labeled `dobby-vps`. The deploy workflow preserves:
 
 - `/opt/dobby/.env`
-- `/opt/dobby/wiki`
+- `/opt/dobby/memory`
 - `/opt/dobby/obsidian-config`
 
 The deploy workflow expects no repository secrets. It runs on the VPS through the `dobby-vps` self-hosted runner, configures the Obsidian Local REST API plugin, rebuilds DOBBY images, runs `docker compose up -d`, and checks `/health`.
@@ -218,7 +218,7 @@ Do not commit plaintext VPS passwords or API secrets into this repository. Keep 
 Before changing deployment behavior, preserve runtime data:
 
 - `/opt/dobby/.env`
-- `/opt/dobby/wiki`
+- `/opt/dobby/memory`
 - `/opt/dobby/obsidian-config`
 - `/opt/dobby/assets`
 - `/opt/dobby/storage/media`
@@ -232,9 +232,9 @@ Back up PostgreSQL plus those folders daily.
 
 DOBBY's backend LLM behavior is guided by external Markdown templates:
 
-- `dobby_app/context/planner.md`: planner policy for choosing `message`, `calendar`, and `wiki` actions.
+- `dobby_app/context/planner.md`: planner policy for choosing `message`, `calendar`, and `memory` actions.
 - `dobby_app/context/tools/message.md`: message executioner prompt and tool contract.
-- `dobby_app/context/tools/wiki.md`: wiki executioner prompt and tool contract.
+- `dobby_app/context/tools/memory.md`: memory executioner prompt and tool contract.
 - `dobby_app/context/tools/calendar.md`: calendar executioner prompt and tool contract.
 
 Prefer updating these templates when changing natural-language assistant behavior. Keep Python responsible for validation, persistence, safe mutation, and integration boundaries.
@@ -246,7 +246,7 @@ The Python package is organized by layer:
 - `dobby_app/config/`: settings and logging setup.
 - `dobby_app/db/`: SQLAlchemy session setup, models, and database repositories.
 - `dobby_app/integrations/`: external systems such as Telegram, CalDAV, Obsidian, OpenAI, Redis/RQ, and transcription.
-- `dobby_app/services/`: application behavior for calendar operations, jobs, daily briefings, wiki memory, and Telegram message history.
+- `dobby_app/services/`: application behavior for calendar operations, jobs, daily briefings, durable memory, and Telegram message history.
 - `dobby_app/assistant/`: planner, executioner loop, tool dispatch, LLM logging, and result types. Tool schemas and wrappers live in `dobby_app/assistant/tools/`.
 - `dobby_app/commands/`: Telegram slash-command dispatchers and command-specific handlers.
 - `dobby_app/entrypoints/`: process entrypoints for FastAPI, polling, scheduler, and worker services.

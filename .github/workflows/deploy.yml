@@ -37,18 +37,18 @@ jobs:
             --exclude='.git' \
             --exclude='.github' \
             --exclude='.env' \
-            --exclude='wiki' \
+            --exclude='memory' \
             --exclude='.venv' \
             --exclude='.pytest_cache' \
             --exclude='.ruff_cache' \
             --exclude='*.egg-info' \
             -czf /tmp/dobby-release.tgz .
 
-          find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name .env ! -name wiki ! -name obsidian-config -exec rm -rf {} +
+          find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name .env ! -name memory ! -name obsidian-config -exec rm -rf {} +
           tar -xzf /tmp/dobby-release.tgz -C "$DEPLOY_PATH"
 
-          if [ ! -d "$DEPLOY_PATH/wiki" ] && [ -d wiki ]; then
-            cp -a wiki "$DEPLOY_PATH/wiki"
+          if [ ! -d "$DEPLOY_PATH/memory" ] && [ -d memory ]; then
+            cp -a memory "$DEPLOY_PATH/memory"
           fi
           printf '%s\n' '${{ github.event.workflow_run.head_sha }}' > "$DEPLOY_PATH/.dobby-version"
 

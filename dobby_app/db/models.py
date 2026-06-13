@@ -68,6 +68,6 @@ class CaldavItem(Base):
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     alarm_minutes_before: Mapped[int | None] = mapped_column(Integer)
-    wiki_page: Mapped[str | None] = mapped_column(Text)
+    memory_page: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

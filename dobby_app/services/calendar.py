@@ -12,7 +12,7 @@ from dobby_app.db.repositories.calendar_items import (
     try_update_caldav_record,
 )
 from dobby_app.db.models import CaldavItem
-from dobby_app.services.wiki_memory import sync_calendar_item_to_wiki, sync_calendar_snapshot_to_wiki
+from dobby_app.services.memory_notes import sync_calendar_item_to_memory, sync_calendar_snapshot_to_memory
 
 
 def list_calendar_items_and_sync(
@@ -21,7 +21,7 @@ def list_calendar_items_and_sync(
     calendar_name: str | None = None,
 ) -> list[dict]:
     items = list_items(starts_at, ends_at, calendar_name=calendar_name)
-    sync_calendar_snapshot_to_wiki(items)
+    sync_calendar_snapshot_to_memory(items)
     return items
 
 
@@ -32,7 +32,7 @@ def create_command_calendar_item(
     starts_at: datetime,
     item_type: str,
 ) -> CaldavItem:
-    wiki_page = sync_calendar_item_to_wiki(title=title, starts_at=starts_at, item_type=item_type)
+    memory_page = sync_calendar_item_to_memory(title=title, starts_at=starts_at, item_type=item_type)
     result = create_calendar_item(
         title=title,
         starts_at=starts_at,
@@ -47,7 +47,7 @@ def create_command_calendar_item(
         starts_at=starts_at,
         ends_at=starts_at + timedelta(minutes=15),
         alarm_minutes_before=0 if item_type == "reminder" else None,
-        wiki_page=wiki_page,
+        memory_page=memory_page,
     )
     session.add(item)
     return item

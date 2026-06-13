@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     app_timezone: str = "Europe/Moscow"
-    wiki_root: Path = Path("wiki")
+    memory_root: Path = Field(Path("memory"), alias="MEMORY_ROOT")
     media_root: Path = Path("storage/media")
     automations_root: Path = Path("data/automations")
 
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     executioner_model: str = Field("gpt-5.4-mini", alias="EXECUTOR_MODEL")
     executioner_reasoning_effort: str = Field("medium", alias="EXECUTOR_REASONING_EFFORT")
     transcription_model: str = Field("gpt-4o-mini-transcribe", alias="TRANSCRIPTION_MODEL")
-    wiki_maintenance_model: str = Field("gpt-4.1", alias="WIKI_MAINTENANCE_MODEL")
+    memory_maintenance_model: str = Field("gpt-4.1", alias="MEMORY_MAINTENANCE_MODEL")
     daily_briefing_model: str = Field("gpt-4.1-mini", alias="DAILY_BRIEFING_MODEL")
 
     @field_validator("telegram_user_id", mode="before")

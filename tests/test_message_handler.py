@@ -48,7 +48,7 @@ def test_memory_command_routes_query_to_agent(monkeypatch):
     async def fake_execute_tool_action(action, latest_text, conversation_context=None):
         calls.append((action, latest_text, conversation_context))
         return ToolExecutionResult(
-            tool="wiki",
+            tool="memory",
             operation="read",
             status="success",
             message="Agent answer",
@@ -60,12 +60,12 @@ def test_memory_command_routes_query_to_agent(monkeypatch):
     response = asyncio.run(handle_memory_query_command("/memory TouchDesigner"))
 
     assert response == "Agent answer"
-    assert calls[0][0].tool == "wiki"
+    assert calls[0][0].tool == "memory"
     assert calls[0][0].operation == "read"
     assert calls[0][0].arguments == {"query": "TouchDesigner"}
 
 
-def test_plain_wiki_query_routes_to_agent(monkeypatch):
+def test_plain_memory_query_routes_to_agent(monkeypatch):
     plan_calls = []
 
     async def fake_plan_actions(text, conversation_context=None, tool_results=None):
@@ -76,25 +76,25 @@ def test_plain_wiki_query_routes_to_agent(monkeypatch):
                     PlannedAction(
                         tool="message",
                         operation="send",
-                        arguments={"content": "Wiki answer"},
+                        arguments={"content": "Memory answer"},
                     )
                 ],
                 confidence=0.9,
             )
         return ActionPlan(
             actions=[
-                PlannedAction(tool="wiki", operation="read", arguments={"query": "Narjiss"})
+                PlannedAction(tool="memory", operation="read", arguments={"query": "Narjiss"})
             ],
             confidence=0.9,
         )
 
     async def fake_execute_tool_action(action, latest_text, conversation_context=None):
-        if action.tool == "wiki":
+        if action.tool == "memory":
             return ToolExecutionResult(
-                tool="wiki",
+                tool="memory",
                 operation="read",
                 status="success",
-                message="Wiki answer",
+                message="Memory answer",
                 data={"query": action.arguments["query"]},
             )
         return ToolExecutionResult(
@@ -109,17 +109,17 @@ def test_plain_wiki_query_routes_to_agent(monkeypatch):
 
     response = asyncio.run(handle_plain_text("What do you remember about Narjiss?"))
 
-    assert response == "Wiki answer"
-    assert plan_calls[1][0]["tool"] == "wiki"
-    assert plan_calls[1][0]["message"] == "Wiki answer"
+    assert response == "Memory answer"
+    assert plan_calls[1][0]["tool"] == "memory"
+    assert plan_calls[1][0]["message"] == "Memory answer"
 
 
-def test_plain_wiki_update_executes_safe_line_update(monkeypatch):
+def test_plain_memory_update_executes_safe_line_update(monkeypatch):
     async def fake_plan_actions(text, conversation_context=None, tool_results=None):
         return ActionPlan(
             actions=[
                 PlannedAction(
-                    tool="wiki",
+                    tool="memory",
                     operation="update",
                     reason="Remove duplicate reminder detail.",
                     arguments={
@@ -141,12 +141,12 @@ def test_plain_wiki_update_executes_safe_line_update(monkeypatch):
 
     async def fake_execute_tool_action(action, latest_text, conversation_context=None):
         calls.append(action)
-        if action.tool == "wiki":
+        if action.tool == "memory":
             return ToolExecutionResult(
-                tool="wiki",
+                tool="memory",
                 operation="update",
                 status="success",
-                message="Updated wiki line in pages/goals/mother-birthday-gift.md.",
+                message="Updated memory line in pages/goals/mother-birthday-gift.md.",
             )
         return ToolExecutionResult(
             tool="message",
@@ -161,11 +161,11 @@ def test_plain_wiki_update_executes_safe_line_update(monkeypatch):
     response = asyncio.run(handle_plain_text("remove one"))
 
     assert response == "Removed the duplicate."
-    assert calls[0].tool == "wiki"
+    assert calls[0].tool == "memory"
     assert calls[0].arguments["exact_line"] == "- Birthday: 2026-07-08."
 
 
-def test_plain_wiki_delete_requires_exact_line(monkeypatch):
+def test_plain_memory_delete_requires_exact_line(monkeypatch):
     async def fake_plan_actions(text, conversation_context=None, tool_results=None):
         if tool_results:
             return ActionPlan(
@@ -181,7 +181,7 @@ def test_plain_wiki_delete_requires_exact_line(monkeypatch):
         return ActionPlan(
             actions=[
                 PlannedAction(
-                    tool="wiki",
+                    tool="memory",
                     operation="delete",
                     arguments={"path": "pages/goals/mother-birthday-gift.md"},
                 )
@@ -200,17 +200,17 @@ def test_plain_wiki_delete_requires_exact_line(monkeypatch):
                 message=action.arguments["content"],
             )
         return ToolExecutionResult(
-            tool="wiki",
+            tool="memory",
             operation="delete",
             status="needs_clarification",
-            message="Which exact wiki line should I delete?",
+            message="Which exact memory line should I delete?",
         )
 
     monkeypatch.setattr("dobby_app.assistant.planner_runner.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_plain_text("remove one"))
 
-    assert response == "Which exact wiki line should I delete?"
+    assert response == "Which exact memory line should I delete?"
 
 
 def test_recent_conversation_context_uses_latest_messages_in_order(monkeypatch, sqlite_session):

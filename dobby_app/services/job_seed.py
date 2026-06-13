@@ -17,7 +17,7 @@ from dobby_app.utils.schedules import rrule_to_cron
 
 JOB_TYPES = {
     "daily-telegram-message": "daily_briefing",
-    "dobby-wiki-maintenance": "wiki_maintenance",
+    "dobby-memory-maintenance": "memory_maintenance",
 }
 
 

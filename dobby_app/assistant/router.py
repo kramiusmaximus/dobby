@@ -47,7 +47,7 @@ ACTION_PLAN_SCHEMA = {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "tool": {"type": "string", "enum": ["message", "calendar", "wiki"]},
+                        "tool": {"type": "string", "enum": ["message", "calendar", "memory"]},
                         "operation": {
                             "type": ["string", "null"],
                             "enum": ["create", "read", "update", "delete", "send", "none", None],

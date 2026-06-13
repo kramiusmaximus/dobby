@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from dobby_app.assistant.router import PlannedAction
 from dobby_app.assistant.tools.calendar import execute_calendar_action
 from dobby_app.assistant.tools.message import execute_message_action
-from dobby_app.assistant.tools.wiki import execute_wiki_action
+from dobby_app.assistant.tools.memory import execute_memory_action
 
 
 class FakeResponses:
@@ -77,7 +77,7 @@ def test_message_executioner_can_request_reaction(monkeypatch):
     assert result.data == {"reaction_emoji": "✅"}
 
 
-def test_wiki_executioner_calls_raw_write_wrapper(monkeypatch):
+def test_memory_executioner_calls_raw_write_wrapper(monkeypatch):
     responses = FakeResponses(
         {
             "name": "obsidian_write",
@@ -96,8 +96,8 @@ def test_wiki_executioner_calls_raw_write_wrapper(monkeypatch):
     monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
-        execute_wiki_action(
-            PlannedAction(tool="wiki", operation="update", arguments={}),
+        execute_memory_action(
+            PlannedAction(tool="memory", operation="update", arguments={}),
             "latest",
         )
     )
@@ -105,10 +105,10 @@ def test_wiki_executioner_calls_raw_write_wrapper(monkeypatch):
     assert result.status == "success"
     assert result.message == "ok"
     assert calls == [("pages/goals/example.md", "# Updated\n")]
-    assert "You execute DOBBY wiki" in responses.requests[0]["input"][0]["content"]
+    assert "You execute DOBBY memory" in responses.requests[0]["input"][0]["content"]
 
 
-def test_wiki_executioner_answers_memory_query_with_obsidian_tool_loop(monkeypatch):
+def test_memory_executioner_answers_memory_query_with_obsidian_tool_loop(monkeypatch):
     class FakeLoopResponses:
         def __init__(self):
             self.requests = []
@@ -148,8 +148,8 @@ def test_wiki_executioner_answers_memory_query_with_obsidian_tool_loop(monkeypat
     monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
-        execute_wiki_action(
-            PlannedAction(tool="wiki", operation="read", arguments={"query": "TouchDesigner"}),
+        execute_memory_action(
+            PlannedAction(tool="memory", operation="read", arguments={"query": "TouchDesigner"}),
             "TouchDesigner",
         )
     )
@@ -162,7 +162,7 @@ def test_wiki_executioner_answers_memory_query_with_obsidian_tool_loop(monkeypat
     assert responses.requests[1]["reasoning"] == {"effort": "medium"}
 
 
-def test_wiki_executioner_requires_path_for_delete(monkeypatch):
+def test_memory_executioner_requires_path_for_delete(monkeypatch):
     responses = FakeResponses(
         {
             "name": "obsidian_delete",
@@ -172,14 +172,14 @@ def test_wiki_executioner_requires_path_for_delete(monkeypatch):
     _patch_openai(monkeypatch, responses)
 
     result = asyncio.run(
-        execute_wiki_action(
-            PlannedAction(tool="wiki", operation="delete", arguments={"path": "pages/goals/example.md"}),
+        execute_memory_action(
+            PlannedAction(tool="memory", operation="delete", arguments={"path": "pages/goals/example.md"}),
             "latest",
         )
     )
 
     assert result.status == "needs_clarification"
-    assert result.message == "Which wiki path should I delete?"
+    assert result.message == "Which memory path should I delete?"
 
 
 def test_calendar_executioner_calls_create_wrapper(monkeypatch):

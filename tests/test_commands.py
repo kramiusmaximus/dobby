@@ -51,13 +51,13 @@ def test_status_reports_polling(sqlite_session):
     assert "polling every" in response
 
 
-def test_memory_queries_wiki(sqlite_session):
+def test_memory_queries_memory(sqlite_session):
     response = handle_command(sqlite_session, "/memory TouchDesigner")
 
     assert response == "Memory queries are handled by DOBBY's Obsidian-backed agent."
 
 
-def test_memory_save_updates_obsidian_wiki(monkeypatch, sqlite_session):
+def test_memory_save_updates_obsidian_memory(monkeypatch, sqlite_session):
     class FakeObsidianClient:
         def __init__(self):
             self.calls = []
@@ -75,8 +75,8 @@ def test_memory_save_updates_obsidian_wiki(monkeypatch, sqlite_session):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.services.wiki_memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.services.wiki_memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.services.memory_notes.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory_notes.get_obsidian_client", lambda: client)
 
     response = handle_command(sqlite_session, "/memory save Mark prefers concise Telegram acknowledgements")
 
@@ -109,7 +109,7 @@ def test_today_lists_one_day_of_calendar_items(monkeypatch, sqlite_session):
         return [{"summary": "Dentist", "start": datetime(2026, 6, 8, 9, 0)}]
 
     monkeypatch.setattr("dobby_app.services.calendar.list_items", fake_list_items)
-    monkeypatch.setattr("dobby_app.services.calendar.sync_calendar_snapshot_to_wiki", lambda items: synced.extend(items))
+    monkeypatch.setattr("dobby_app.services.calendar.sync_calendar_snapshot_to_memory", lambda items: synced.extend(items))
 
     response = handle_command(sqlite_session, "/today")
 
@@ -127,7 +127,7 @@ def test_upcoming_lists_fourteen_days_of_calendar_items(monkeypatch, sqlite_sess
         return [{"summary": "Studio", "start": datetime(2026, 6, 12, 15, 0)}]
 
     monkeypatch.setattr("dobby_app.services.calendar.list_items", fake_list_items)
-    monkeypatch.setattr("dobby_app.services.calendar.sync_calendar_snapshot_to_wiki", lambda items: synced.extend(items))
+    monkeypatch.setattr("dobby_app.services.calendar.sync_calendar_snapshot_to_memory", lambda items: synced.extend(items))
 
     response = handle_command(sqlite_session, "/upcoming")
 
@@ -143,8 +143,8 @@ def test_remind_creates_calendar_reminder(monkeypatch, sqlite_session):
 
     monkeypatch.setattr("dobby_app.commands.calendar.parse_datetime", lambda text: starts_at)
     monkeypatch.setattr(
-        "dobby_app.services.calendar.sync_calendar_item_to_wiki",
-        lambda **kwargs: calls.append(("wiki", kwargs)) or "pages/calendar/june-2026-commitments.md",
+        "dobby_app.services.calendar.sync_calendar_item_to_memory",
+        lambda **kwargs: calls.append(("memory", kwargs)) or "pages/calendar/june-2026-commitments.md",
     )
 
     def fake_create_calendar_item(**kwargs):
@@ -159,9 +159,9 @@ def test_remind_creates_calendar_reminder(monkeypatch, sqlite_session):
     assert created["title"] == "Call dentist"
     assert created["item_type"] == "reminder"
     assert created["alarm_minutes_before"] == 0
-    assert [name for name, _ in calls] == ["wiki", "caldav"]
+    assert [name for name, _ in calls] == ["memory", "caldav"]
     item = sqlite_session.query(CaldavItem).filter_by(uid="reminder-uid").one()
-    assert item.wiki_page == "pages/calendar/june-2026-commitments.md"
+    assert item.memory_page == "pages/calendar/june-2026-commitments.md"
     assert "Created reminder: Call dentist" in response
 
 
@@ -172,8 +172,8 @@ def test_event_creates_calendar_event(monkeypatch, sqlite_session):
 
     monkeypatch.setattr("dobby_app.commands.calendar.parse_datetime", lambda text: starts_at)
     monkeypatch.setattr(
-        "dobby_app.services.calendar.sync_calendar_item_to_wiki",
-        lambda **kwargs: calls.append(("wiki", kwargs)) or "pages/calendar/june-2026-commitments.md",
+        "dobby_app.services.calendar.sync_calendar_item_to_memory",
+        lambda **kwargs: calls.append(("memory", kwargs)) or "pages/calendar/june-2026-commitments.md",
     )
 
     def fake_create_calendar_item(**kwargs):
@@ -188,9 +188,9 @@ def test_event_creates_calendar_event(monkeypatch, sqlite_session):
     assert created["title"] == "Studio visit"
     assert created["item_type"] == "event"
     assert created["alarm_minutes_before"] is None
-    assert [name for name, _ in calls] == ["wiki", "caldav"]
+    assert [name for name, _ in calls] == ["memory", "caldav"]
     item = sqlite_session.query(CaldavItem).filter_by(uid="event-uid").one()
-    assert item.wiki_page == "pages/calendar/june-2026-commitments.md"
+    assert item.memory_page == "pages/calendar/june-2026-commitments.md"
     assert "Created event: Studio visit" in response
 
 

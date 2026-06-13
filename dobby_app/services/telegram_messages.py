@@ -23,7 +23,7 @@ from dobby_app.services.telegram_history import (
 )
 from dobby_app.assistant.tool_dispatch import execute_tool_action
 from dobby_app.integrations.transcription import download_voice, transcribe_audio
-from dobby_app.services.wiki_memory import handle_memory_command
+from dobby_app.services.memory_notes import handle_memory_command
 
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ async def handle_memory_query_command(text: str) -> str:
         return handle_memory_command(rest)
 
     result = await execute_tool_action(
-        PlannedAction(tool="wiki", operation="read", arguments={"query": rest}),
+        PlannedAction(tool="memory", operation="read", arguments={"query": rest}),
         rest,
         None,
     )

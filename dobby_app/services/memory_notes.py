@@ -49,14 +49,14 @@ def save_memory_note(note: str) -> None:
     _ensure_memory_inbox(today)
     _obsidian_patch_frontmatter(MEMORY_INBOX, "updated", today)
     get_obsidian_client().append(MEMORY_INBOX, f"\n\n## {today}\n\n- {note}\n")
-    _append_wiki_log(f"\n## [{today}] memory | Telegram Memory Inbox\n\n- Saved memory note: {note}\n")
+    _append_memory_log(f"\n## [{today}] memory | Telegram Memory Inbox\n\n- Saved memory note: {note}\n")
 
 
-def update_wiki_line(*, path: str, exact_line: str, replacement: str, reason: str | None = None) -> str:
+def update_memory_line(*, path: str, exact_line: str, replacement: str, reason: str | None = None) -> str:
     if not obsidian_is_enabled():
         raise RuntimeError("Obsidian API is not configured; memory writes are unavailable.")
     if not path.strip() or not exact_line.strip():
-        raise ValueError("Wiki update requires a path and exact_line.")
+        raise ValueError("Memory update requires a path and exact_line.")
 
     today = date.today().isoformat()
     client = get_obsidian_client()
@@ -64,7 +64,7 @@ def update_wiki_line(*, path: str, exact_line: str, replacement: str, reason: st
     updated = _replace_exact_line(content, exact_line, replacement)
     client.write(path, updated)
     _try_patch_frontmatter(path, "updated", today)
-    _try_append_wiki_log(
+    _try_append_memory_log(
         "\n".join(
             [
                 f"\n## [{today}] memory-update | {path}",
@@ -76,14 +76,14 @@ def update_wiki_line(*, path: str, exact_line: str, replacement: str, reason: st
             ]
         )
     )
-    return f"Updated wiki line in {path}."
+    return f"Updated memory line in {path}."
 
 
-def delete_wiki_line(*, path: str, exact_line: str, reason: str | None = None) -> str:
+def delete_memory_line(*, path: str, exact_line: str, reason: str | None = None) -> str:
     if not obsidian_is_enabled():
         raise RuntimeError("Obsidian API is not configured; memory writes are unavailable.")
     if not path.strip() or not exact_line.strip():
-        raise ValueError("Wiki delete requires a path and exact_line.")
+        raise ValueError("Memory delete requires a path and exact_line.")
 
     today = date.today().isoformat()
     client = get_obsidian_client()
@@ -91,7 +91,7 @@ def delete_wiki_line(*, path: str, exact_line: str, reason: str | None = None) -
     updated = _delete_exact_line(content, exact_line)
     client.write(path, updated)
     _try_patch_frontmatter(path, "updated", today)
-    _try_append_wiki_log(
+    _try_append_memory_log(
         "\n".join(
             [
                 f"\n## [{today}] memory-delete | {path}",
@@ -102,11 +102,11 @@ def delete_wiki_line(*, path: str, exact_line: str, reason: str | None = None) -
             ]
         )
     )
-    return f"Deleted wiki line from {path}."
+    return f"Deleted memory line from {path}."
 
 
-def sync_calendar_item_to_wiki(*, title: str, starts_at: datetime, item_type: str) -> str:
-    return _sync_calendar_marker_to_wiki(
+def sync_calendar_item_to_memory(*, title: str, starts_at: datetime, item_type: str) -> str:
+    return _sync_calendar_marker_to_memory(
         title=title,
         starts_at=starts_at,
         item_type=item_type,
@@ -115,13 +115,13 @@ def sync_calendar_item_to_wiki(*, title: str, starts_at: datetime, item_type: st
     )
 
 
-def sync_calendar_snapshot_to_wiki(items: list[dict]) -> None:
+def sync_calendar_snapshot_to_memory(items: list[dict]) -> None:
     for item in items:
         title = str(item.get("summary") or "").strip()
         starts_at = _coerce_datetime(item.get("start"))
         if not title or not starts_at:
             continue
-        _sync_calendar_marker_to_wiki(
+        _sync_calendar_marker_to_memory(
             title=title,
             starts_at=starts_at,
             item_type="calendar",
@@ -135,7 +135,7 @@ def _calendar_page_path(starts_at: datetime) -> str:
     return f"pages/calendar/{month}-{starts_at.year}-commitments.md"
 
 
-def _sync_calendar_marker_to_wiki(
+def _sync_calendar_marker_to_memory(
     *,
     title: str,
     starts_at: datetime,
@@ -144,7 +144,7 @@ def _sync_calendar_marker_to_wiki(
     log: bool,
 ) -> str:
     if not obsidian_is_enabled():
-        raise RuntimeError("Obsidian API is not configured; wiki calendar sync is unavailable.")
+        raise RuntimeError("Obsidian API is not configured; memory calendar sync is unavailable.")
 
     today = date.today().isoformat()
     rel_path = _calendar_page_path(starts_at)
@@ -164,11 +164,11 @@ def _sync_calendar_marker_to_wiki(
         entry = (
             f"\n## [{today}] calendar-sync | {title}\n\n"
             f"- Synced Obsidian calendar source before CalDAV write.\n"
-            f"- Wiki page: {rel_path}\n"
+            f"- Memory page: {rel_path}\n"
             f"- Scheduled time: {timestamp}\n"
             f"- Type: {item_type}\n"
         )
-        _try_append_wiki_log(entry)
+        _try_append_memory_log(entry)
 
     return rel_path
 
@@ -198,7 +198,7 @@ def _ensure_memory_inbox(today: str) -> None:
                 "",
                 "# Telegram Memory Inbox",
                 "",
-                "Durable memory captured from Telegram before it is filed into a more specific wiki page.",
+                "Durable memory captured from Telegram before it is filed into a more specific memory page.",
                 "",
             ]
         ),
@@ -260,9 +260,9 @@ def _replace_exact_line(content: str, exact_line: str, replacement: str) -> str:
     lines = content.splitlines(keepends=True)
     matches = [index for index, line in enumerate(lines) if line.rstrip("\r\n") == exact_line]
     if not matches:
-        raise ValueError("Exact line was not found in the wiki page.")
+        raise ValueError("Exact line was not found in the memory page.")
     if len(matches) > 1:
-        raise ValueError("Exact line appears more than once; refusing ambiguous wiki update.")
+        raise ValueError("Exact line appears more than once; refusing ambiguous memory update.")
     newline = _line_ending(lines[matches[0]])
     lines[matches[0]] = replacement + newline
     return "".join(lines)
@@ -272,9 +272,9 @@ def _delete_exact_line(content: str, exact_line: str) -> str:
     lines = content.splitlines(keepends=True)
     matches = [index for index, line in enumerate(lines) if line.rstrip("\r\n") == exact_line]
     if not matches:
-        raise ValueError("Exact line was not found in the wiki page.")
+        raise ValueError("Exact line was not found in the memory page.")
     if len(matches) > 1:
-        raise ValueError("Exact line appears more than once; refusing ambiguous wiki delete.")
+        raise ValueError("Exact line appears more than once; refusing ambiguous memory delete.")
     del lines[matches[0]]
     return "".join(lines)
 
@@ -287,7 +287,7 @@ def _line_ending(line: str) -> str:
     return ""
 
 
-def _append_wiki_log(entry: str) -> None:
+def _append_memory_log(entry: str) -> None:
     client = get_obsidian_client()
     try:
         client.read(LOG_PAGE)
@@ -317,12 +317,12 @@ def _append_wiki_log(entry: str) -> None:
     client.append(LOG_PAGE, entry.rstrip() + "\n")
 
 
-def _try_append_wiki_log(entry: str) -> None:
+def _try_append_memory_log(entry: str) -> None:
     try:
-        _append_wiki_log(entry)
+        _append_memory_log(entry)
     except ObsidianHTTPError as exc:
-        # Audit logging should not turn an already-applied wiki mutation into a user-visible failure.
-        logger.warning("Could not append Obsidian wiki log entry: %s", exc)
+        # Audit logging should not turn an already-applied memory mutation into a user-visible failure.
+        logger.warning("Could not append Obsidian memory log entry: %s", exc)
 
 
 def _coerce_datetime(value: object) -> datetime | None:

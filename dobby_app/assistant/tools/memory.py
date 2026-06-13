@@ -3,7 +3,7 @@ from __future__ import annotations
 from dobby_app.assistant.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.assistant.executioner_agent import ExecutionTool, run_executioner_agent
 from dobby_app.assistant.tools.common import needs_clarification_schema
-from dobby_app.assistant.tools.wiki_schemas import (
+from dobby_app.assistant.tools.memory_schemas import (
     obsidian_active_file_path,
     obsidian_active_file_path_schema,
     obsidian_append,
@@ -34,7 +34,7 @@ from dobby_app.assistant.tools.wiki_schemas import (
 from dobby_app.assistant.router import ConversationMessage, PlannedAction
 
 
-WIKI_TOOL_DEFINITIONS = (
+MEMORY_TOOL_DEFINITIONS = (
     (obsidian_list_schema, obsidian_list, False),
     (obsidian_search_simple_schema, obsidian_search_simple, False),
     (obsidian_search_structured_schema, obsidian_search_structured, False),
@@ -51,23 +51,23 @@ WIKI_TOOL_DEFINITIONS = (
 )
 
 
-async def execute_wiki_action(
+async def execute_memory_action(
     action: PlannedAction,
     latest_text: str,
     conversation_context: list[ConversationMessage] | None = None,
 ) -> ToolExecutionResult:
     return await run_executioner_agent(
-        executor_name="wiki",
-        context_template="tools/wiki.md",
+        executor_name="memory",
+        context_template="tools/memory.md",
         action=action,
         latest_text=latest_text,
         conversation_context=conversation_context,
         tools=[
-            *wiki_execution_tools(),
+            *memory_execution_tools(),
             ExecutionTool(
                 schema=needs_clarification_schema(),
                 handler=lambda message: ToolExecutionResult(
-                    tool="wiki",
+                    tool="memory",
                     operation=action.operation,
                     status=ToolStatus.NEEDS_CLARIFICATION,
                     message=message,
@@ -78,8 +78,8 @@ async def execute_wiki_action(
     )
 
 
-def wiki_execution_tools() -> list[ExecutionTool]:
+def memory_execution_tools() -> list[ExecutionTool]:
     return [
         ExecutionTool(schema=schema_factory(), handler=handler, terminal=terminal)
-        for schema_factory, handler, terminal in WIKI_TOOL_DEFINITIONS
+        for schema_factory, handler, terminal in MEMORY_TOOL_DEFINITIONS
     ]

@@ -18,8 +18,8 @@ def test_planner_context_mentions_durable_daily_and_weekly_plans():
 def test_planner_context_does_not_document_executor_operations():
     prompt = _planner_system_prompt()
 
-    assert "wiki.create" not in prompt
-    assert "wiki.update" not in prompt
+    assert "memory.create" not in prompt
+    assert "memory.update" not in prompt
     assert "calendar.create" not in prompt
     assert "message.send" not in prompt
 
@@ -27,15 +27,15 @@ def test_planner_context_does_not_document_executor_operations():
 def test_tool_contexts_document_executor_operations():
     message_context = load_context_template("tools/message.md")
     calendar_context = load_context_template("tools/calendar.md")
-    wiki_context = load_context_template("tools/wiki.md")
+    memory_context = load_context_template("tools/memory.md")
 
     assert "Available tools" in message_context
     assert "Available tools" in calendar_context
-    assert "Available tools" in wiki_context
+    assert "Available tools" in memory_context
     assert "Format Telegram messages as HTML, not Markdown." in message_context
     assert "<b>important text</b>" in message_context
-    assert "obsidian_write" in wiki_context
-    assert "Do not guess paths or targets." in wiki_context
+    assert "obsidian_write" in memory_context
+    assert "Do not guess paths or targets." in memory_context
 
 
 def test_planner_uses_planner_model(monkeypatch):

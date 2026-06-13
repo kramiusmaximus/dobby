@@ -5,7 +5,7 @@ from typing import Any
 from dobby_app.integrations.obsidian import get_obsidian_client, obsidian_is_enabled
 
 
-class WikiService:
+class MemoryService:
     def require_enabled(self) -> None:
         if not obsidian_is_enabled():
             raise RuntimeError("Obsidian API is not configured, so DOBBY memory queries are unavailable.")
@@ -85,4 +85,4 @@ class WikiService:
         return get_obsidian_client().delete(path)
 
 
-wiki_service = WikiService()
+memory_service = MemoryService()

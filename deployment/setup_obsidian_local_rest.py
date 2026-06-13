@@ -64,7 +64,7 @@ def _download_plugin(plugin_dir: Path) -> None:
 def main() -> int:
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
     env_path = root / ".env"
-    wiki_root = root / "wiki"
+    memory_root = root / "memory"
     obsidian_config = root / "obsidian-config"
 
     env = _load_env(env_path)
@@ -79,7 +79,7 @@ def main() -> int:
         },
     )
 
-    vault_config = wiki_root / ".obsidian"
+    vault_config = memory_root / ".obsidian"
     plugin_dir = vault_config / "plugins" / PLUGIN_ID
     _download_plugin(plugin_dir)
 
