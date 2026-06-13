@@ -166,6 +166,10 @@ GitHub Actions runs:
 - Docker build.
 - VPS deploy after successful `main` CI.
 
+Repository workflow:
+
+- Push DOBBY changes directly to `main` unless Mark explicitly asks for a feature branch or pull request.
+
 Initial VPS setup:
 
 ```bash
