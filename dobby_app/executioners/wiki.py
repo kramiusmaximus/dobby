@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dobby_app.execution_results import ToolExecutionResult, ToolStatus
-from dobby_app.executioner_agent import ExecutionTool, run_executioner_agent
+from dobby_app.assistant.execution_results import ToolExecutionResult, ToolStatus
+from dobby_app.assistant.executioner_agent import ExecutionTool, run_executioner_agent
 from dobby_app.executioners.common import needs_clarification_schema
 from dobby_app.executioners.wiki_tools import (
     obsidian_active_file_path,
@@ -31,7 +31,7 @@ from dobby_app.executioners.wiki_tools import (
     obsidian_write,
     obsidian_write_schema,
 )
-from dobby_app.router import ConversationMessage, PlannedAction
+from dobby_app.assistant.router import ConversationMessage, PlannedAction
 
 
 WIKI_TOOL_DEFINITIONS = (

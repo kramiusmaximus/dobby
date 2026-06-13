@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 
-from dobby_app.obsidian_client import ObsidianClient, ObsidianConfig
+from dobby_app.integrations.obsidian_client import ObsidianClient, ObsidianConfig
 
 
 def _response(status_code, **kwargs):
@@ -16,7 +16,7 @@ def test_obsidian_client_read_sends_auth_and_tls(monkeypatch):
         captured.update({"method": method, "url": url, **kwargs})
         return _response(200, text="# Note")
 
-    monkeypatch.setattr("dobby_app.obsidian_client.httpx.request", fake_request)
+    monkeypatch.setattr("dobby_app.integrations.obsidian_client.httpx.request", fake_request)
     client = ObsidianClient(
         ObsidianConfig(api_url="https://127.0.0.1:27124", api_key="secret", verify_tls=False)
     )
@@ -35,7 +35,7 @@ def test_obsidian_client_patch_uses_target_headers(monkeypatch):
         captured.update({"method": method, "url": url, **kwargs})
         return _response(200, text="")
 
-    monkeypatch.setattr("dobby_app.obsidian_client.httpx.request", fake_request)
+    monkeypatch.setattr("dobby_app.integrations.obsidian_client.httpx.request", fake_request)
     client = ObsidianClient(
         ObsidianConfig(api_url="https://127.0.0.1:27124", api_key="secret", verify_tls=False)
     )
@@ -63,7 +63,7 @@ def test_obsidian_client_document_map_uses_accept_header(monkeypatch):
         captured.update({"method": method, "url": url, **kwargs})
         return _response(200, json={"headings": []})
 
-    monkeypatch.setattr("dobby_app.obsidian_client.httpx.request", fake_request)
+    monkeypatch.setattr("dobby_app.integrations.obsidian_client.httpx.request", fake_request)
     client = ObsidianClient(
         ObsidianConfig(api_url="https://127.0.0.1:27124", api_key="secret", verify_tls=False)
     )

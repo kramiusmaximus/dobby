@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from dobby_app.router import PlannedAction
+from dobby_app.assistant.router import PlannedAction
 from dobby_app.executioners.calendar import execute_calendar_action
 from dobby_app.executioners.message import execute_message_action
 from dobby_app.executioners.wiki import execute_wiki_action
@@ -36,10 +36,10 @@ def _patch_openai(monkeypatch, fake_responses):
             assert api_key == "test-key"
             self.responses = fake_responses
 
-    monkeypatch.setattr("dobby_app.llm_client.AsyncOpenAI", FakeAsyncOpenAI)
-    monkeypatch.setattr("dobby_app.executioner_agent.settings.openai_api_key", "test-key")
-    monkeypatch.setattr("dobby_app.executioner_agent.settings.executioner_model", "executioner-test-model")
-    monkeypatch.setattr("dobby_app.executioner_agent.settings.executioner_reasoning_effort", "medium")
+    monkeypatch.setattr("dobby_app.assistant.llm_client.AsyncOpenAI", FakeAsyncOpenAI)
+    monkeypatch.setattr("dobby_app.assistant.executioner_agent.settings.openai_api_key", "test-key")
+    monkeypatch.setattr("dobby_app.assistant.executioner_agent.settings.executioner_model", "executioner-test-model")
+    monkeypatch.setattr("dobby_app.assistant.executioner_agent.settings.executioner_reasoning_effort", "medium")
 
 
 def test_message_executioner_uses_context_and_executor_model(monkeypatch):
@@ -92,8 +92,8 @@ def test_wiki_executioner_calls_raw_write_wrapper(monkeypatch):
             calls.append((path, content))
             return "ok"
 
-    monkeypatch.setattr("dobby_app.wiki_service.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.wiki_service.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.memory.wiki_service.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.memory.wiki_service.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
         execute_wiki_action(
@@ -144,8 +144,8 @@ def test_wiki_executioner_answers_memory_query_with_obsidian_tool_loop(monkeypat
             assert path == "index.md"
             return "# Index\n\n- [[Studio Project]]"
 
-    monkeypatch.setattr("dobby_app.wiki_service.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.wiki_service.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.memory.wiki_service.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.memory.wiki_service.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
         execute_wiki_action(

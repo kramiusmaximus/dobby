@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from dobby_app.config import Settings
+from dobby_app.core.config import Settings
 
 
 def test_model_and_reasoning_defaults():

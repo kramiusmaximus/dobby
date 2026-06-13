@@ -4,8 +4,8 @@ from datetime import datetime
 
 import pytest
 
-from dobby_app.obsidian_client import ObsidianHTTPError
-from dobby_app.wiki_memory import delete_wiki_line, sync_calendar_item_to_wiki, update_wiki_line
+from dobby_app.integrations.obsidian_client import ObsidianHTTPError
+from dobby_app.memory.wiki_memory import delete_wiki_line, sync_calendar_item_to_wiki, update_wiki_line
 
 
 def test_calendar_sync_writes_through_obsidian(monkeypatch):
@@ -32,8 +32,8 @@ def test_calendar_sync_writes_through_obsidian(monkeypatch):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.wiki_memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.wiki_memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.get_obsidian_client", lambda: client)
 
     rel_path = sync_calendar_item_to_wiki(
         title="Studio visit",
@@ -73,8 +73,8 @@ def test_update_wiki_line_replaces_one_exact_line(monkeypatch):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.wiki_memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.wiki_memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.get_obsidian_client", lambda: client)
 
     response = update_wiki_line(
         path="pages/goals/example.md",
@@ -107,8 +107,8 @@ def test_delete_wiki_line_removes_one_exact_line(monkeypatch):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.wiki_memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.wiki_memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.get_obsidian_client", lambda: client)
 
     response = delete_wiki_line(
         path="pages/goals/example.md",
@@ -141,8 +141,8 @@ def test_delete_wiki_line_succeeds_when_log_append_404s(monkeypatch):
             return ""
 
     client = FakeObsidianClient()
-    monkeypatch.setattr("dobby_app.wiki_memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.wiki_memory.get_obsidian_client", lambda: client)
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.get_obsidian_client", lambda: client)
 
     response = delete_wiki_line(
         path="pages/goals/example.md",
@@ -159,8 +159,8 @@ def test_delete_wiki_line_refuses_ambiguous_line(monkeypatch):
         def read(self, path):
             return "# Note\n\n- Duplicate\n- Duplicate\n"
 
-    monkeypatch.setattr("dobby_app.wiki_memory.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.wiki_memory.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.memory.wiki_memory.get_obsidian_client", lambda: FakeObsidianClient())
 
     with pytest.raises(ValueError, match="appears more than once"):
         delete_wiki_line(path="pages/goals/example.md", exact_line="- Duplicate")

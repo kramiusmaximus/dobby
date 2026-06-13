@@ -6,8 +6,8 @@ from typing import Any
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from dobby_app.db import session_scope
-from dobby_app.models import CaldavItem
+from dobby_app.core.db import session_scope
+from dobby_app.core.models import CaldavItem
 
 logger = logging.getLogger(__name__)
 

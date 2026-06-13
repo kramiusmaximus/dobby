@@ -6,13 +6,13 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 from fastapi import FastAPI, Header, HTTPException, Request
 
-from dobby_app.bot_commands import register_bot_commands
-from dobby_app.config import settings
-from dobby_app.db import init_db, session_scope
-from dobby_app.logging_config import configure_logging
-from dobby_app.message_handler import reply_to_message
-from dobby_app.runtime_status import runtime_status
-from dobby_app.seed import seed_default_jobs
+from dobby_app.telegram.bot_commands import register_bot_commands
+from dobby_app.core.config import settings
+from dobby_app.core.db import init_db, session_scope
+from dobby_app.core.logging_config import configure_logging
+from dobby_app.telegram.message_handler import reply_to_message
+from dobby_app.core.runtime_status import runtime_status
+from dobby_app.scheduling.seed import seed_default_jobs
 
 
 configure_logging()

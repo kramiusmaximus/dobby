@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from rq import Worker
 
-from dobby_app.db import init_db
-from dobby_app.logging_config import configure_logging
-from dobby_app.queueing import default_queue, redis_conn
+from dobby_app.core.db import init_db
+from dobby_app.core.logging_config import configure_logging
+from dobby_app.scheduling.queueing import default_queue, redis_conn
 
 
 def main() -> None:

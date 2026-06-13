@@ -3,16 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from dobby_app.calendar_service import (
+from dobby_app.scheduling.calendar_service import (
     create_execution_calendar_item,
     delete_execution_calendar_item,
     list_calendar_items_and_sync,
     update_execution_calendar_item,
 )
-from dobby_app.config import settings
-from dobby_app.execution_results import ToolExecutionResult, ToolStatus
+from dobby_app.core.config import settings
+from dobby_app.assistant.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.executioners.common import schema
-from dobby_app.timeparse import parse_datetime
+from dobby_app.core.timeparse import parse_datetime
 
 
 def calendar_read_range(

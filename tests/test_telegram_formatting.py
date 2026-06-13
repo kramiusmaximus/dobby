@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from dobby_app.telegram_client import send_telegram_message
+from dobby_app.integrations.telegram_client import send_telegram_message
 
 
 def test_telegram_client_sends_html_parse_mode(monkeypatch):
@@ -18,8 +18,8 @@ def test_telegram_client_sends_html_parse_mode(monkeypatch):
         async def send_message(self, **kwargs):
             calls.append(("send_message", kwargs))
 
-    monkeypatch.setattr("dobby_app.telegram_client.settings.telegram_user_id", 123)
-    monkeypatch.setattr("dobby_app.telegram_client.get_bot", lambda: FakeBot())
+    monkeypatch.setattr("dobby_app.integrations.telegram_client.settings.telegram_user_id", 123)
+    monkeypatch.setattr("dobby_app.integrations.telegram_client.get_bot", lambda: FakeBot())
 
     asyncio.run(send_telegram_message("Birthday is on <b>8 July 2026</b>."))
 

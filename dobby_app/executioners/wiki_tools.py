@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from dobby_app.execution_results import ToolExecutionResult, ToolStatus
+from dobby_app.assistant.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.executioners.common import schema
-from dobby_app.wiki_service import wiki_service
+from dobby_app.memory.wiki_service import wiki_service
 
 
 def obsidian_health() -> Any:

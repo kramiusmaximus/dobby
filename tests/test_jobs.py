@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 
-from dobby_app.jobs import _daily_briefing, _telegram_reconciliation
+from dobby_app.scheduling.jobs import _daily_briefing, _telegram_reconciliation
 
 
 def test_daily_briefing_sends_four_formatted_messages(monkeypatch):
@@ -47,11 +47,11 @@ Buy the present before the birthday.
     async def fake_send_telegram_message(text):
         sent.append(text)
 
-    monkeypatch.setattr("dobby_app.daily_briefing.random.choice", lambda options: options[0])
-    monkeypatch.setattr("dobby_app.daily_briefing.list_items", fake_list_items)
-    monkeypatch.setattr("dobby_app.daily_briefing.send_telegram_message", fake_send_telegram_message)
-    monkeypatch.setattr("dobby_app.daily_briefing.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.daily_briefing.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.scheduling.daily_briefing.random.choice", lambda options: options[0])
+    monkeypatch.setattr("dobby_app.scheduling.daily_briefing.list_items", fake_list_items)
+    monkeypatch.setattr("dobby_app.scheduling.daily_briefing.send_telegram_message", fake_send_telegram_message)
+    monkeypatch.setattr("dobby_app.scheduling.daily_briefing.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.scheduling.daily_briefing.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(_daily_briefing())
 
@@ -79,7 +79,7 @@ def test_telegram_reconciliation_job_is_silent(monkeypatch):
     async def fake_send_telegram_message(text):
         sent.append(text)
 
-    monkeypatch.setattr("dobby_app.jobs.send_telegram_message", fake_send_telegram_message)
+    monkeypatch.setattr("dobby_app.scheduling.jobs.send_telegram_message", fake_send_telegram_message)
 
     result = asyncio.run(_telegram_reconciliation())
 

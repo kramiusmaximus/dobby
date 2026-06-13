@@ -107,7 +107,7 @@ Job commands:
 /job retry <run_id>
 ```
 
-Plain text and voice messages without slash commands are routed through OpenAI using the model constants in `dobby_app/config.py`.
+Plain text and voice messages without slash commands are routed through OpenAI using the model constants in `dobby_app/core/config.py`.
 
 Model constants:
 
@@ -125,7 +125,7 @@ Planner and executioner startup logs include the configured model and reasoning 
 
 Every Telegram message should receive either a response, a failure reply with context, or a thumbs-up acknowledgement.
 
-Production Telegram intake is handled by the VPS `poller` service or webhook route. Runtime Telegram sends use `dobby_app.telegram_client`.
+Production Telegram intake is handled by the VPS `poller` service or webhook route. Runtime Telegram sends use `dobby_app/integrations/telegram_client.py`.
 
 Telegram voice notes arrive as OGG/Opus files. The VPS app downloads voice files under the configured media root, converts unsupported audio formats to mp3 with `ffmpeg`, then calls OpenAI transcription using `TRANSCRIPTION_MODEL`.
 
@@ -238,6 +238,20 @@ DOBBY's backend LLM behavior is guided by external Markdown templates:
 - `dobby_app/context/tools/calendar.md`: calendar executioner prompt and tool contract.
 
 Prefer updating these templates when changing natural-language assistant behavior. Keep Python responsible for validation, persistence, safe mutation, and integration boundaries.
+
+## Package Layout
+
+The Python package is organized by responsibility:
+
+- `dobby_app/core/`: configuration, database setup, models, logging, runtime status, and shared parsing utilities.
+- `dobby_app/assistant/`: planner, executioner loop, OpenAI client plumbing, tool dispatch, and tool result types.
+- `dobby_app/commands/`: Telegram slash-command dispatchers and command-specific handlers.
+- `dobby_app/entrypoints/`: process entrypoints for FastAPI, polling, scheduler, and worker services.
+- `dobby_app/integrations/`: external API clients for Telegram, CalDAV, Obsidian, and transcription.
+- `dobby_app/memory/`: Obsidian-backed wiki memory services and mutation helpers.
+- `dobby_app/scheduling/`: scheduled jobs, job repositories, queueing, calendar service, and daily briefing logic.
+- `dobby_app/telegram/`: Telegram message handling, bot command registration, and transcript history.
+- `dobby_app/executioners/`: domain executioner tool registries and schemas for message, calendar, and wiki actions.
 
 ## Local Development
 
