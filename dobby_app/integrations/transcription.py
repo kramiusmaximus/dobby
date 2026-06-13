@@ -7,7 +7,7 @@ from aiogram import Bot
 from aiogram.types import Message
 from openai import AsyncOpenAI
 
-from dobby_app.core.config import settings
+from dobby_app.config.settings import settings
 
 
 async def download_voice(message: Message, bot: Bot) -> Path:

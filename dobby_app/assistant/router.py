@@ -7,9 +7,9 @@ import json
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from dobby_app.core.config import settings
-from dobby_app.core.context_templates import load_context_template
-from dobby_app.assistant.llm_client import create_response
+from dobby_app.config.settings import settings
+from dobby_app.utils.context_templates import load_context_template
+from dobby_app.integrations.openai import create_response
 from dobby_app.assistant.llm_logging import action_plan_for_log, truncate_for_log
 
 ConversationMessage = dict[str, str]

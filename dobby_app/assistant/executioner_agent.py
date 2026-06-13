@@ -8,10 +8,10 @@ from datetime import datetime
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
-from dobby_app.core.config import settings
-from dobby_app.core.context_templates import load_context_template
+from dobby_app.config.settings import settings
+from dobby_app.utils.context_templates import load_context_template
 from dobby_app.assistant.execution_results import ToolExecutionResult, ToolStatus
-from dobby_app.assistant.llm_client import create_response
+from dobby_app.integrations.openai import create_response
 from dobby_app.assistant.llm_logging import (
     planned_action_for_log,
     result_for_log,

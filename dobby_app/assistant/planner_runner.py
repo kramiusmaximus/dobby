@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from dobby_app.assistant.execution_results import ToolExecutionResult, ToolStatus
 from dobby_app.assistant.llm_logging import tool_execution_result_payload
 from dobby_app.assistant.router import ActionPlan, assistant_chat, plan_actions
-from dobby_app.assistant.tool_executors import execute_tool_action
+from dobby_app.assistant.tool_dispatch import execute_tool_action
 
 MAX_PLANNER_TOOL_ROUNDS = 3
 

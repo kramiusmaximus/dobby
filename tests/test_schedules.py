@@ -1,4 +1,4 @@
-from dobby_app.scheduling.schedules import parse_schedule, rrule_to_cron
+from dobby_app.utils.schedules import parse_schedule, rrule_to_cron
 
 
 def test_parse_daily_schedule():

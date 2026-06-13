@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from dobby_app.core.db import Base
+from dobby_app.db.session import Base
 
 
 @pytest.fixture()

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from dobby_app.core.models import ScheduledJob
-from dobby_app.scheduling.seed import seed_default_jobs
+from dobby_app.db.models import ScheduledJob
+from dobby_app.services.job_seed import seed_default_jobs
 
 
 def test_seed_default_jobs(tmp_path, monkeypatch, sqlite_session):
@@ -18,7 +18,7 @@ rrule = "RRULE:FREQ=WEEKLY;BYHOUR=9;BYMINUTE=0;BYDAY=SU,MO,TU,WE,TH,FR,SA"
 """,
         encoding="utf-8",
     )
-    monkeypatch.setattr("dobby_app.scheduling.seed.settings.automations_root", Path(automations))
+    monkeypatch.setattr("dobby_app.services.job_seed.settings.automations_root", Path(automations))
     seed_default_jobs(sqlite_session)
     job = sqlite_session.query(ScheduledJob).one()
     assert job.name == "daily-telegram-message"

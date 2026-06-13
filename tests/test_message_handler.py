@@ -4,15 +4,15 @@ import asyncio
 from contextlib import contextmanager
 from types import SimpleNamespace
 
-from dobby_app.telegram.message_handler import (
+from dobby_app.services.telegram_messages import (
     handle_message,
     handle_memory_query_command,
     handle_plain_text,
 )
 from dobby_app.assistant.execution_results import ToolExecutionResult
-from dobby_app.core.models import TelegramMessage
+from dobby_app.db.models import TelegramMessage
 from dobby_app.assistant.router import ActionPlan, PlannedAction
-from dobby_app.telegram.history import message_already_recorded, recent_conversation_context
+from dobby_app.services.telegram_history import message_already_recorded, recent_conversation_context
 
 
 def test_message_already_recorded_detects_duplicate(monkeypatch, sqlite_session):
@@ -21,7 +21,7 @@ def test_message_already_recorded_detects_duplicate(monkeypatch, sqlite_session)
         yield sqlite_session
         sqlite_session.commit()
 
-    monkeypatch.setattr("dobby_app.telegram.history.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.services.telegram_history.session_scope", fake_session_scope)
     message = SimpleNamespace(message_id=1988, chat=SimpleNamespace(id=1106380883))
 
     assert not message_already_recorded(message)
@@ -55,7 +55,7 @@ def test_memory_command_routes_query_to_agent(monkeypatch):
             data={"query": action.arguments["query"]},
         )
 
-    monkeypatch.setattr("dobby_app.telegram.message_handler.execute_tool_action", fake_execute_tool_action)
+    monkeypatch.setattr("dobby_app.services.telegram_messages.execute_tool_action", fake_execute_tool_action)
 
     response = asyncio.run(handle_memory_query_command("/memory TouchDesigner"))
 
@@ -214,7 +214,7 @@ def test_plain_wiki_delete_requires_exact_line(monkeypatch):
 
 
 def test_recent_conversation_context_uses_latest_messages_in_order(monkeypatch, sqlite_session):
-    monkeypatch.setattr("dobby_app.telegram.history.settings.telegram_context_message_count", 2)
+    monkeypatch.setattr("dobby_app.services.telegram_history.settings.telegram_context_message_count", 2)
     for index in range(5):
         sqlite_session.add(
             TelegramMessage(
@@ -292,10 +292,10 @@ def test_handle_message_stores_reply_metadata_and_passes_context(monkeypatch, sq
             confidence=0.9,
         )
 
-    monkeypatch.setattr("dobby_app.telegram.message_handler.session_scope", fake_session_scope)
-    monkeypatch.setattr("dobby_app.telegram.history.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.services.telegram_messages.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.services.telegram_history.session_scope", fake_session_scope)
     monkeypatch.setattr("dobby_app.assistant.planner_runner.plan_actions", fake_plan_actions)
-    monkeypatch.setattr("dobby_app.telegram.history.settings.telegram_context_message_count", 5)
+    monkeypatch.setattr("dobby_app.services.telegram_history.settings.telegram_context_message_count", 5)
 
     async def fake_execute_tool_action(action, latest_text, conversation_context=None):
         return ToolExecutionResult(

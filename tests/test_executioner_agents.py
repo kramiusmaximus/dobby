@@ -4,9 +4,9 @@ import asyncio
 from types import SimpleNamespace
 
 from dobby_app.assistant.router import PlannedAction
-from dobby_app.executioners.calendar import execute_calendar_action
-from dobby_app.executioners.message import execute_message_action
-from dobby_app.executioners.wiki import execute_wiki_action
+from dobby_app.assistant.tools.calendar import execute_calendar_action
+from dobby_app.assistant.tools.message import execute_message_action
+from dobby_app.assistant.tools.wiki import execute_wiki_action
 
 
 class FakeResponses:
@@ -36,7 +36,7 @@ def _patch_openai(monkeypatch, fake_responses):
             assert api_key == "test-key"
             self.responses = fake_responses
 
-    monkeypatch.setattr("dobby_app.assistant.llm_client.AsyncOpenAI", FakeAsyncOpenAI)
+    monkeypatch.setattr("dobby_app.integrations.openai.AsyncOpenAI", FakeAsyncOpenAI)
     monkeypatch.setattr("dobby_app.assistant.executioner_agent.settings.openai_api_key", "test-key")
     monkeypatch.setattr("dobby_app.assistant.executioner_agent.settings.executioner_model", "executioner-test-model")
     monkeypatch.setattr("dobby_app.assistant.executioner_agent.settings.executioner_reasoning_effort", "medium")
@@ -92,8 +92,8 @@ def test_wiki_executioner_calls_raw_write_wrapper(monkeypatch):
             calls.append((path, content))
             return "ok"
 
-    monkeypatch.setattr("dobby_app.memory.wiki_service.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.memory.wiki_service.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
         execute_wiki_action(
@@ -144,8 +144,8 @@ def test_wiki_executioner_answers_memory_query_with_obsidian_tool_loop(monkeypat
             assert path == "index.md"
             return "# Index\n\n- [[Studio Project]]"
 
-    monkeypatch.setattr("dobby_app.memory.wiki_service.obsidian_is_enabled", lambda: True)
-    monkeypatch.setattr("dobby_app.memory.wiki_service.get_obsidian_client", lambda: FakeObsidianClient())
+    monkeypatch.setattr("dobby_app.services.memory.obsidian_is_enabled", lambda: True)
+    monkeypatch.setattr("dobby_app.services.memory.get_obsidian_client", lambda: FakeObsidianClient())
 
     result = asyncio.run(
         execute_wiki_action(
@@ -196,7 +196,7 @@ def test_calendar_executioner_calls_create_wrapper(monkeypatch):
     _patch_openai(monkeypatch, responses)
 
     monkeypatch.setattr(
-        "dobby_app.executioners.calendar_tools.create_execution_calendar_item",
+        "dobby_app.assistant.tools.calendar_schemas.create_execution_calendar_item",
         lambda title, starts_at, item_type, alarm_minutes_before, duration_minutes, calendar_name: (
             f"Created {item_type}: {title} at parsed."
         ),
@@ -231,7 +231,7 @@ def test_calendar_delete_calls_delete_wrapper(monkeypatch):
     _patch_openai(monkeypatch, responses)
     calls = []
     monkeypatch.setattr(
-        "dobby_app.executioners.calendar_tools.delete_execution_calendar_item",
+        "dobby_app.assistant.tools.calendar_schemas.delete_execution_calendar_item",
         lambda **kwargs: calls.append(kwargs),
     )
 

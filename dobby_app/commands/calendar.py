@@ -5,9 +5,9 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from dobby_app.scheduling.calendar_service import create_command_calendar_item, list_calendar_items_and_sync
-from dobby_app.core.config import settings
-from dobby_app.core.timeparse import parse_datetime
+from dobby_app.services.calendar import create_command_calendar_item, list_calendar_items_and_sync
+from dobby_app.config.settings import settings
+from dobby_app.utils.timeparse import parse_datetime
 
 
 def create_from_text(session: Session, text: str, item_type: str) -> str:

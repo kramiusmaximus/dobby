@@ -5,14 +5,14 @@ from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from dobby_app.core.config import settings
-from dobby_app.core.db import SessionLocal, init_db
-from dobby_app.scheduling.job_repository import list_all_scheduled_jobs
-from dobby_app.scheduling.jobs import enqueue_job
-from dobby_app.core.logging_config import configure_logging
-from dobby_app.core.models import ScheduledJob
-from dobby_app.scheduling.schedules import cron_trigger
-from dobby_app.scheduling.seed import seed_default_jobs
+from dobby_app.config.settings import settings
+from dobby_app.db.session import SessionLocal, init_db
+from dobby_app.db.repositories.jobs import list_all_scheduled_jobs
+from dobby_app.services.jobs import enqueue_job
+from dobby_app.config.logging import configure_logging
+from dobby_app.db.models import ScheduledJob
+from dobby_app.utils.schedules import cron_trigger
+from dobby_app.services.job_seed import seed_default_jobs
 
 
 def sync_scheduler(scheduler: BackgroundScheduler) -> None:
