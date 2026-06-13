@@ -47,6 +47,9 @@ def _ensure_lightweight_schema_updates() -> None:
                 "reply_to_message_id": "INTEGER",
                 "reply_to_text": "TEXT",
                 "reply_to_kind": "VARCHAR(32)",
+                "planner_batch_id": "VARCHAR(64)",
+                "planner_processing_started_at": "DATETIME",
+                "planner_processed_at": "DATETIME",
             }
             for column, column_type in additions.items():
                 if column not in existing:

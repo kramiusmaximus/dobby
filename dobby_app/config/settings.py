@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str = ""
     telegram_poll_interval_seconds: int = 60
     telegram_context_message_count: int = Field(10, alias="TELEGRAM_CONTEXT_MESSAGE_COUNT")
+    telegram_batch_debounce_seconds: int = Field(30, alias="TELEGRAM_BATCH_DEBOUNCE_SECONDS")
+    telegram_batch_scan_interval_seconds: int = Field(5, alias="TELEGRAM_BATCH_SCAN_INTERVAL_SECONDS")
+    telegram_batch_stale_processing_seconds: int = Field(300, alias="TELEGRAM_BATCH_STALE_PROCESSING_SECONDS")
     public_webhook_base_url: str = ""
     log_level: str = Field("DEBUG", alias="LOG_LEVEL")
 

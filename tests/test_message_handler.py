@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 from dobby_app.services.messages import (
+    batch_conversation_context,
+    claim_next_due_batch,
     handle_message,
     handle_memory_query_command,
     handle_plain_text,
 )
 from dobby_app.assistant.execution_results import ToolExecutionResult
+from dobby_app.assistant.tool_dispatch import execute_tool_action
 from dobby_app.db.models import TelegramMessage
-from dobby_app.assistant.router import ActionPlan, PlannedAction
+from dobby_app.assistant.router import ActionPlan, PlannedAction, PlannedTask
 from dobby_app.services.messages import message_already_recorded, recent_conversation_context
+from dobby_app.services.messages.batches import process_claimed_batch
 
 
 def test_message_already_recorded_detects_duplicate(monkeypatch, sqlite_session):
@@ -271,41 +276,15 @@ def test_recent_conversation_context_uses_latest_messages_in_order(monkeypatch, 
     ]
 
 
-def test_handle_message_stores_reply_metadata_and_passes_context(monkeypatch, sqlite_session):
+def test_handle_message_stores_reply_metadata_without_planning(monkeypatch, sqlite_session):
     @contextmanager
     def fake_session_scope():
         yield sqlite_session
         sqlite_session.commit()
 
-    calls = []
-
-    async def fake_plan_actions(text, conversation_context=None, tool_results=None):
-        calls.append((text, conversation_context))
-        return ActionPlan(
-            actions=[
-                PlannedAction(
-                    tool="message",
-                    operation="send",
-                    arguments={"content": "Handled"},
-                )
-            ],
-            confidence=0.9,
-        )
-
     monkeypatch.setattr("dobby_app.services.messages.handlers.session_scope", fake_session_scope)
     monkeypatch.setattr("dobby_app.services.messages.history.session_scope", fake_session_scope)
-    monkeypatch.setattr("dobby_app.assistant.planner_runner.plan_actions", fake_plan_actions)
     monkeypatch.setattr("dobby_app.services.messages.history.settings.telegram_context_message_count", 5)
-
-    async def fake_execute_tool_action(action, latest_text, conversation_context=None):
-        return ToolExecutionResult(
-            tool="message",
-            operation="send",
-            status="success",
-            message=action.arguments["content"],
-        )
-
-    monkeypatch.setattr("dobby_app.assistant.planner_runner.execute_tool_action", fake_execute_tool_action)
 
     sqlite_session.add(
         TelegramMessage(
@@ -338,11 +317,256 @@ def test_handle_message_stores_reply_metadata_and_passes_context(monkeypatch, sq
     response = asyncio.run(handle_message(message, bot=SimpleNamespace()))
 
     stored = sqlite_session.query(TelegramMessage).filter_by(message_id=301).one()
-    assert response == "Handled"
+    assert response is None
     assert stored.reply_to_message_id == 300
     assert stored.reply_to_kind == "assistant"
     assert stored.reply_to_text == "Other Important Reminders\n\n- Mother Birthday Gift: Buy present"
-    assert calls[0][1][-1]["content"].startswith("remove one\n\n[Telegram reply context:")
+    assert stored.planner_processed_at is None
+
+
+def test_claim_next_due_batch_waits_for_debounce(monkeypatch, sqlite_session):
+    @contextmanager
+    def fake_session_scope():
+        yield sqlite_session
+        sqlite_session.commit()
+
+    monkeypatch.setattr("dobby_app.services.messages.batches.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.services.messages.batches.settings.telegram_batch_debounce_seconds", 30)
+    monkeypatch.setattr("dobby_app.services.messages.batches.settings.telegram_batch_stale_processing_seconds", 300)
+    now = datetime(2026, 6, 13, 12, 0, 0)
+    sqlite_session.add(
+        TelegramMessage(
+            update_id=None,
+            message_id=401,
+            chat_id=1,
+            sender_id=1,
+            text="too new",
+            kind="text",
+            created_at=now - timedelta(seconds=10),
+            raw={},
+        )
+    )
+    sqlite_session.commit()
+
+    assert claim_next_due_batch(now=now) is None
+
+
+def test_claim_next_due_batch_groups_due_messages_by_chat(monkeypatch, sqlite_session):
+    @contextmanager
+    def fake_session_scope():
+        yield sqlite_session
+        sqlite_session.commit()
+
+    monkeypatch.setattr("dobby_app.services.messages.batches.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.services.messages.batches.settings.telegram_batch_debounce_seconds", 30)
+    monkeypatch.setattr("dobby_app.services.messages.batches.settings.telegram_batch_stale_processing_seconds", 300)
+    now = datetime(2026, 6, 13, 12, 0, 0)
+    for message_id, chat_id, text in [(501, 1, "one"), (502, 1, "two"), (503, 2, "other chat")]:
+        sqlite_session.add(
+            TelegramMessage(
+                update_id=None,
+                message_id=message_id,
+                chat_id=chat_id,
+                sender_id=chat_id,
+                text=text,
+                kind="text",
+                created_at=now - timedelta(seconds=45),
+                raw={},
+            )
+        )
+    sqlite_session.commit()
+
+    rows = claim_next_due_batch(now=now)
+
+    assert [row.message_id for row in rows or []] == [501, 502]
+    assert all(row.planner_batch_id for row in rows or [])
+
+
+def test_claim_next_due_batch_excludes_processed_and_reclaims_stale(monkeypatch, sqlite_session):
+    @contextmanager
+    def fake_session_scope():
+        yield sqlite_session
+        sqlite_session.commit()
+
+    monkeypatch.setattr("dobby_app.services.messages.batches.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.services.messages.batches.settings.telegram_batch_debounce_seconds", 30)
+    monkeypatch.setattr("dobby_app.services.messages.batches.settings.telegram_batch_stale_processing_seconds", 300)
+    now = datetime(2026, 6, 13, 12, 0, 0)
+    sqlite_session.add_all(
+        [
+            TelegramMessage(
+                update_id=None,
+                message_id=601,
+                chat_id=1,
+                sender_id=1,
+                text="done",
+                kind="text",
+                created_at=now - timedelta(minutes=10),
+                planner_processed_at=now - timedelta(minutes=9),
+                raw={},
+            ),
+            TelegramMessage(
+                update_id=None,
+                message_id=602,
+                chat_id=1,
+                sender_id=1,
+                text="stale",
+                kind="text",
+                created_at=now - timedelta(minutes=10),
+                planner_processing_started_at=now - timedelta(minutes=6),
+                raw={},
+            ),
+        ]
+    )
+    sqlite_session.commit()
+
+    rows = claim_next_due_batch(now=now)
+
+    assert [row.message_id for row in rows or []] == [602]
+
+
+def test_batch_context_uses_prior_processed_history(monkeypatch, sqlite_session):
+    @contextmanager
+    def fake_session_scope():
+        yield sqlite_session
+        sqlite_session.commit()
+
+    monkeypatch.setattr("dobby_app.services.messages.batches.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.services.messages.history.session_scope", fake_session_scope)
+    now = datetime(2026, 6, 13, 12, 0, 0)
+    sqlite_session.add_all(
+        [
+            TelegramMessage(
+                update_id=None,
+                message_id=701,
+                chat_id=1,
+                sender_id=1,
+                text="processed old",
+                kind="text",
+                created_at=now - timedelta(minutes=3),
+                planner_processed_at=now - timedelta(minutes=2),
+                raw={},
+            ),
+            TelegramMessage(
+                update_id=None,
+                message_id=702,
+                chat_id=1,
+                sender_id=1,
+                text="unprocessed old",
+                kind="text",
+                created_at=now - timedelta(minutes=2),
+                raw={},
+            ),
+            TelegramMessage(
+                update_id=None,
+                message_id=703,
+                chat_id=1,
+                sender_id=1,
+                text="new task",
+                kind="text",
+                created_at=now - timedelta(minutes=1),
+                raw={},
+            ),
+        ]
+    )
+    sqlite_session.commit()
+
+    rows = sqlite_session.query(TelegramMessage).filter(TelegramMessage.message_id == 703).all()
+    context = batch_conversation_context(rows)
+
+    assert context[0] == {"role": "user", "content": "processed old"}
+    assert "unprocessed old" not in str(context)
+    assert "message_id=703" in context[-1]["content"]
+    assert "new task" in context[-1]["content"]
+
+
+def test_process_claimed_batch_replies_to_task_source_message(monkeypatch, sqlite_session):
+    @contextmanager
+    def fake_session_scope():
+        yield sqlite_session
+        sqlite_session.commit()
+
+    sent = []
+
+    class FakeBot:
+        async def send_message(self, chat_id, text, **kwargs):
+            sent.append((chat_id, text, kwargs))
+            return SimpleNamespace(
+                message_id=900 + len(sent),
+                from_user=SimpleNamespace(id=0),
+                model_dump=lambda mode="json": {"message_id": 900 + len(sent)},
+            )
+
+    async def fake_plan_actions(text, conversation_context=None, tool_results=None):
+        return ActionPlan(
+            tasks=[
+                PlannedTask(
+                    source_message_ids=[801],
+                    actions=[PlannedAction(tool="message", operation="send", arguments={"content": "First"})],
+                ),
+                PlannedTask(
+                    source_message_ids=[802],
+                    actions=[PlannedAction(tool="message", operation="send", arguments={"content": "Second"})],
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    async def fake_execute_tool_action(action, latest_text, conversation_context=None):
+        return ToolExecutionResult(
+            tool="message",
+            operation="send",
+            status="success",
+            message=action.arguments["content"],
+        )
+
+    monkeypatch.setattr("dobby_app.services.messages.batches.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.services.messages.history.session_scope", fake_session_scope)
+    monkeypatch.setattr("dobby_app.services.messages.batches.plan_actions", fake_plan_actions)
+    monkeypatch.setattr("dobby_app.assistant.planner_runner.execute_tool_action", fake_execute_tool_action)
+    rows = []
+    for message_id, text in [(801, "task one"), (802, "task two")]:
+        row = TelegramMessage(
+            update_id=None,
+            message_id=message_id,
+            chat_id=1,
+            sender_id=1,
+            text=text,
+            kind="text",
+            raw={},
+        )
+        sqlite_session.add(row)
+        rows.append(row)
+    sqlite_session.commit()
+
+    asyncio.run(process_claimed_batch(FakeBot(), rows))
+
+    assert [call[2]["reply_to_message_id"] for call in sent] == [801, 802]
+    assert sqlite_session.query(TelegramMessage).filter_by(kind="assistant").count() == 2
+
+
+def test_slash_command_executes_through_command_tool(monkeypatch, sqlite_session):
+    @contextmanager
+    def fake_session_scope():
+        yield sqlite_session
+        sqlite_session.commit()
+
+    monkeypatch.setattr("dobby_app.assistant.tool_dispatch.session_scope", fake_session_scope)
+
+    result = asyncio.run(
+        execute_tool_action(
+            PlannedAction(
+                tool="command",
+                operation="execute",
+                arguments={"command": "/status"},
+            ),
+            "/status",
+        )
+    )
+
+    assert result.tool == "command"
+    assert result.status == "success"
+    assert "DOBBY is running" in result.message
 
 
 def test_plain_text_passes_conversation_context_to_router_and_chat(monkeypatch):

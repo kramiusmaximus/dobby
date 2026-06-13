@@ -25,9 +25,28 @@ class PlannedAction:
 
 
 @dataclass(frozen=True)
-class ActionPlan:
+class PlannedTask:
+    source_message_ids: list[int]
     actions: list[PlannedAction]
-    confidence: float
+    reason: str | None = None
+
+
+class ActionPlan:
+    def __init__(
+        self,
+        *,
+        confidence: float,
+        tasks: list[PlannedTask] | None = None,
+        actions: list[PlannedAction] | None = None,
+    ) -> None:
+        if tasks is None:
+            tasks = [PlannedTask(source_message_ids=[], actions=actions or [])]
+        self.tasks = tasks
+        self.confidence = confidence
+
+    @property
+    def actions(self) -> list[PlannedAction]:
+        return [action for task in self.tasks for action in task.actions]
 
 
 ACTION_PLAN_SCHEMA = {
@@ -39,7 +58,7 @@ ACTION_PLAN_SCHEMA = {
         "additionalProperties": False,
         "properties": {
             "confidence": {"type": "number"},
-            "actions": {
+            "tasks": {
                 "type": "array",
                 "minItems": 1,
                 "maxItems": 5,
@@ -47,71 +66,91 @@ ACTION_PLAN_SCHEMA = {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "tool": {"type": "string", "enum": ["message", "calendar", "memory", "jobs"]},
-                        "operation": {
-                            "type": ["string", "null"],
-                            "enum": [
-                                "create",
-                                "read",
-                                "update",
-                                "delete",
-                                "send",
-                                "run",
-                                "pause",
-                                "resume",
-                                "none",
-                                None,
-                            ],
-                        },
                         "reason": {"type": ["string", "null"]},
-                        "arguments": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "properties": {
-                                "kind": {"type": ["string", "null"], "enum": ["reminder", "event", "item", None]},
-                                "title": {"type": ["string", "null"]},
-                                "datetime": {"type": ["string", "null"]},
-                                "duration_minutes": {"type": ["integer", "null"]},
-                                "alarm_minutes_before": {"type": ["integer", "null"]},
-                                "days": {"type": ["integer", "null"]},
-                                "query": {"type": ["string", "null"]},
-                                "content": {"type": ["string", "null"]},
-                                "path": {"type": ["string", "null"]},
-                                "exact_line": {"type": ["string", "null"]},
-                                "replacement": {"type": ["string", "null"]},
-                                "name": {"type": ["string", "null"]},
-                                "display_name": {"type": ["string", "null"]},
-                                "schedule": {"type": ["string", "null"]},
-                                "prompt": {"type": ["string", "null"]},
-                                "enabled": {"type": ["boolean", "null"]},
-                                "run_id": {"type": ["integer", "null"]},
+                        "source_message_ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                        },
+                        "actions": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 5,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "tool": {"type": "string", "enum": ["message", "calendar", "memory", "jobs", "command"]},
+                                    "operation": {
+                                        "type": ["string", "null"],
+                                        "enum": [
+                                            "create",
+                                            "read",
+                                            "update",
+                                            "delete",
+                                            "send",
+                                            "run",
+                                            "pause",
+                                            "resume",
+                                            "execute",
+                                            "none",
+                                            None,
+                                        ],
+                                    },
+                                    "reason": {"type": ["string", "null"]},
+                                    "arguments": {
+                                        "type": "object",
+                                        "additionalProperties": False,
+                                        "properties": {
+                                            "kind": {"type": ["string", "null"], "enum": ["reminder", "event", "item", None]},
+                                            "title": {"type": ["string", "null"]},
+                                            "datetime": {"type": ["string", "null"]},
+                                            "duration_minutes": {"type": ["integer", "null"]},
+                                            "alarm_minutes_before": {"type": ["integer", "null"]},
+                                            "days": {"type": ["integer", "null"]},
+                                            "query": {"type": ["string", "null"]},
+                                            "content": {"type": ["string", "null"]},
+                                            "path": {"type": ["string", "null"]},
+                                            "exact_line": {"type": ["string", "null"]},
+                                            "replacement": {"type": ["string", "null"]},
+                                            "name": {"type": ["string", "null"]},
+                                            "display_name": {"type": ["string", "null"]},
+                                            "schedule": {"type": ["string", "null"]},
+                                            "prompt": {"type": ["string", "null"]},
+                                            "enabled": {"type": ["boolean", "null"]},
+                                            "run_id": {"type": ["integer", "null"]},
+                                            "command": {"type": ["string", "null"]},
+                                        },
+                                        "required": [
+                                            "kind",
+                                            "title",
+                                            "datetime",
+                                            "duration_minutes",
+                                            "alarm_minutes_before",
+                                            "days",
+                                            "query",
+                                            "content",
+                                            "path",
+                                            "exact_line",
+                                            "replacement",
+                                            "name",
+                                            "display_name",
+                                            "schedule",
+                                            "prompt",
+                                            "enabled",
+                                            "run_id",
+                                            "command",
+                                        ],
+                                    },
+                                },
+                                "required": ["tool", "operation", "reason", "arguments"],
                             },
-                            "required": [
-                                "kind",
-                                "title",
-                                "datetime",
-                                "duration_minutes",
-                                "alarm_minutes_before",
-                                "days",
-                                "query",
-                                "content",
-                                "path",
-                                "exact_line",
-                                "replacement",
-                                "name",
-                                "display_name",
-                                "schedule",
-                                "prompt",
-                                "enabled",
-                                "run_id",
-                            ],
                         },
                     },
-                    "required": ["tool", "operation", "reason", "arguments"],
+                    "required": ["reason", "source_message_ids", "actions"],
                 },
             },
         },
-        "required": ["confidence", "actions"],
+        "required": ["confidence", "tasks"],
     },
 }
 
@@ -157,12 +196,17 @@ async def plan_actions(
     )
     if not settings.openai_api_key:
         plan = ActionPlan(
-            actions=[
-                PlannedAction(
-                    tool="message",
-                    operation="send",
-                    arguments={"content": "I can route commands, but OPENAI_API_KEY is not configured yet."},
-                )
+            tasks=[
+                PlannedTask(
+                    source_message_ids=[],
+                    actions=[
+                        PlannedAction(
+                            tool="message",
+                            operation="send",
+                            arguments={"content": "I can route commands, but OPENAI_API_KEY is not configured yet."},
+                        )
+                    ],
+                ),
             ],
             confidence=0.0,
         )
@@ -182,22 +226,49 @@ async def plan_actions(
         text={"format": ACTION_PLAN_SCHEMA},
     )
     payload = json.loads(response.output_text)
-    actions = [
-        PlannedAction(
-            tool=item["tool"],
-            operation=item.get("operation"),
-            reason=item.get("reason"),
-            arguments=item.get("arguments") or {},
-        )
-        for item in payload.get("actions", [])
-    ]
+    tasks = _tasks_from_payload(payload)
     plan = ActionPlan(
-        actions=actions,
+        tasks=tasks,
         confidence=float(payload.get("confidence") or 0),
     )
     logger.info("Planner raw response: %s", truncate_for_log(response.output_text))
     logger.info("Planner plan: %s", action_plan_for_log(plan))
     return plan
+
+
+def _tasks_from_payload(payload: dict[str, Any]) -> list[PlannedTask]:
+    if "tasks" in payload:
+        return [
+            PlannedTask(
+                source_message_ids=[int(message_id) for message_id in item.get("source_message_ids", [])],
+                reason=item.get("reason"),
+                actions=[
+                    PlannedAction(
+                        tool=action["tool"],
+                        operation=action.get("operation"),
+                        reason=action.get("reason"),
+                        arguments=action.get("arguments") or {},
+                    )
+                    for action in item.get("actions", [])
+                ],
+            )
+            for item in payload.get("tasks", [])
+        ]
+    return [
+        PlannedTask(
+            source_message_ids=[],
+            reason=None,
+            actions=[
+                PlannedAction(
+                    tool=item["tool"],
+                    operation=item.get("operation"),
+                    reason=item.get("reason"),
+                    arguments=item.get("arguments") or {},
+                )
+                for item in payload.get("actions", [])
+            ],
+        )
+    ]
 
 
 def _planner_system_prompt() -> str:

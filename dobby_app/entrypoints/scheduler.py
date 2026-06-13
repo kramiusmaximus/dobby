@@ -11,6 +11,7 @@ from dobby_app.db.repositories.jobs import list_all_scheduled_jobs
 from dobby_app.workflows.jobs import enqueue_job
 from dobby_app.config.logging import configure_logging
 from dobby_app.db.models import ScheduledJob
+from dobby_app.services.messages.batches import process_due_message_batches_sync
 from dobby_app.utils.schedules import cron_trigger
 from dobby_app.workflows.job_seed import seed_default_jobs
 
@@ -56,6 +57,14 @@ def main() -> None:
     configure_logging()
     init_db()
     scheduler = BackgroundScheduler(timezone=settings.app_timezone)
+    scheduler.add_job(
+        process_due_message_batches_sync,
+        "interval",
+        seconds=settings.telegram_batch_scan_interval_seconds,
+        id="telegram-message-batches",
+        max_instances=1,
+        coalesce=True,
+    )
     scheduler.start()
     while True:
         sync_scheduler(scheduler)

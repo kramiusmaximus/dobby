@@ -7,20 +7,16 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message, ReactionTypeEmoji
 
 from dobby_app.assistant.planner_runner import (
-    HandlerResponse,
     execute_action_plan_result,
     handle_plain_text_result,
 )
 from dobby_app.assistant.router import ActionPlan, PlannedAction
 from dobby_app.assistant.tool_dispatch import execute_tool_action
-from dobby_app.commands import handle_command
 from dobby_app.db.session import session_scope
 from dobby_app.integrations.transcription import download_voice, transcribe_audio
 from dobby_app.services.memory import handle_memory_command
 from dobby_app.services.messages.history import (
     message_already_recorded,
-    recent_conversation_context,
-    record_assistant_message,
     record_incoming_message,
 )
 
@@ -37,23 +33,10 @@ async def handle_message(message: Message, bot: Bot) -> str | None:
         voice_path = await download_voice(message, bot)
         text = await transcribe_audio(voice_path)
 
-    conversation_context = None
     with session_scope() as session:
         record_incoming_message(session, message, text, kind="voice" if message.voice else "text")
         session.flush()
-
-        if text.startswith("/"):
-            command = text.strip().split(maxsplit=1)[0].lower()
-            if command == "/memory":
-                return await handle_memory_query_command(text)
-            return handle_command(session, text)
-
-        conversation_context = recent_conversation_context(session, message.chat.id)
-
-    if not text.strip():
-        return None
-    response = await handle_plain_text_result(text, conversation_context)
-    return response.text
+    return None
 
 
 async def handle_plain_text(text: str, conversation_context: list[dict[str, str]] | None = None) -> str:
@@ -91,15 +74,15 @@ async def reply_to_message(bot: Bot, message: Message) -> None:
             return
 
         text = message.text or message.caption or ""
-        if text.startswith("/") or message.voice:
-            response_text = await handle_message(message, bot)
-            response = HandlerResponse(text=response_text)
+        if message.voice:
+            voice_path = await download_voice(message, bot)
+            text = await transcribe_audio(voice_path)
+            kind = "voice"
         else:
-            with session_scope() as session:
-                record_incoming_message(session, message, text, kind="text")
-                session.flush()
-                conversation_context = recent_conversation_context(session, message.chat.id)
-            response = await handle_plain_text_result(text, conversation_context) if text.strip() else HandlerResponse()
+            kind = "text"
+        with session_scope() as session:
+            record_incoming_message(session, message, text, kind=kind)
+            session.flush()
     except Exception as exc:
         logger.exception("Telegram message handling failed")
         await bot.send_message(
@@ -110,23 +93,6 @@ async def reply_to_message(bot: Bot, message: Message) -> None:
             reply_to_message_id=message.message_id,
         )
         return
-
-    if response.text and response.text.strip():
-        sent_message = await bot.send_message(
-            message.chat.id,
-            response.text,
-            parse_mode="HTML",
-            disable_web_page_preview=True,
-            reply_to_message_id=message.message_id,
-        )
-        record_assistant_message(message, sent_message, response.text)
-        return
-
-    if response.reaction_emoji:
-        await react_to_message(bot, message, response.reaction_emoji)
-        return
-
-    await acknowledge_message(bot, message)
 
 
 async def acknowledge_message(bot: Bot, message: Message) -> None:

@@ -107,7 +107,7 @@ Job commands:
 /job retry <run_id>
 ```
 
-Plain text and voice messages without slash commands are routed through OpenAI using the model constants in `dobby_app/config/settings.py`.
+Telegram text, captions, voice transcripts, and slash commands are recorded first, then processed in batches after a quiet window. The planner sees the whole unprocessed burst and decides whether it contains one or more tasks.
 
 Model constants:
 
@@ -119,6 +119,14 @@ EXECUTOR_REASONING_EFFORT
 TRANSCRIPTION_MODEL
 MEMORY_MAINTENANCE_MODEL
 DAILY_BRIEFING_MODEL
+```
+
+Batch intake settings:
+
+```text
+TELEGRAM_BATCH_DEBOUNCE_SECONDS
+TELEGRAM_BATCH_SCAN_INTERVAL_SECONDS
+TELEGRAM_BATCH_STALE_PROCESSING_SECONDS
 ```
 
 Planner and executioner startup logs include the configured model and reasoning effort. Defaults are `PLANNER_MODEL=gpt-5.5` with `PLANNER_REASONING_EFFORT=low`, and `EXECUTOR_MODEL=gpt-5.4-mini` with `EXECUTOR_REASONING_EFFORT=medium`.

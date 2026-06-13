@@ -58,14 +58,24 @@ def reply_kind(session: Session, chat_id: int, message_id: int | None) -> str | 
     )
 
 
-def recent_conversation_context(session: Session, chat_id: int) -> list[dict[str, str]]:
+def recent_conversation_context(
+    session: Session,
+    chat_id: int,
+    *,
+    before_id: int | None = None,
+    processed_only: bool = False,
+) -> list[dict[str, str]]:
     limit = max(settings.telegram_context_message_count, 1)
+    query = select(TelegramMessage).where(TelegramMessage.chat_id == chat_id, TelegramMessage.text.is_not(None))
+    if before_id is not None:
+        query = query.where(TelegramMessage.id < before_id)
+    if processed_only:
+        query = query.where(
+            (TelegramMessage.kind == "assistant") | (TelegramMessage.planner_processed_at.is_not(None))
+        )
     rows = (
         session.execute(
-            select(TelegramMessage)
-            .where(TelegramMessage.chat_id == chat_id, TelegramMessage.text.is_not(None))
-            .order_by(TelegramMessage.id.desc())
-            .limit(limit)
+            query.order_by(TelegramMessage.id.desc()).limit(limit)
         )
         .scalars()
         .all()
@@ -96,14 +106,18 @@ def context_content(row: TelegramMessage, content: str) -> str:
 
 def record_assistant_message(message: Message, sent_message: Message, text: str) -> None:
     with session_scope() as session:
-        session.add(
-            TelegramMessage(
-                update_id=None,
-                message_id=sent_message.message_id,
-                chat_id=message.chat.id,
-                sender_id=sent_message.from_user.id if sent_message.from_user else 0,
-                text=text,
-                kind="assistant",
-                raw=sent_message.model_dump(mode="json"),
-            )
+        record_assistant_sent_message(session, message.chat.id, sent_message, text)
+
+
+def record_assistant_sent_message(session: Session, chat_id: int, sent_message: Message, text: str) -> None:
+    session.add(
+        TelegramMessage(
+            update_id=None,
+            message_id=sent_message.message_id,
+            chat_id=chat_id,
+            sender_id=sent_message.from_user.id if sent_message.from_user else 0,
+            text=text,
+            kind="assistant",
+            raw=sent_message.model_dump(mode="json"),
         )
+    )

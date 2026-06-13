@@ -21,6 +21,9 @@ class TelegramMessage(Base):
     reply_to_message_id: Mapped[int | None] = mapped_column(Integer, index=True)
     reply_to_text: Mapped[str | None] = mapped_column(Text)
     reply_to_kind: Mapped[str | None] = mapped_column(String(32))
+    planner_batch_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    planner_processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    planner_processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     raw: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 

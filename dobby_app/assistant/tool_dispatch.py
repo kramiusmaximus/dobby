@@ -9,6 +9,8 @@ from dobby_app.assistant.tools.memory import execute_memory_action
 from dobby_app.assistant.tools.messaging import execute_message_action
 from dobby_app.assistant.llm_logging import planned_action_for_log, result_for_log, truncate_for_log
 from dobby_app.assistant.router import ConversationMessage, PlannedAction
+from dobby_app.commands import handle_command
+from dobby_app.db.session import session_scope
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,28 @@ async def execute_tool_action(
         return result
     if action.tool == "jobs":
         result = await execute_jobs_action(action, latest_text, conversation_context)
+        logger.info("Executor action completed: result=%s", result_for_log(result))
+        return result
+    if action.tool == "command":
+        command_text = (action.arguments.get("command") or latest_text or "").strip()
+        if not command_text:
+            result = ToolExecutionResult(
+                tool="command",
+                operation=action.operation or "execute",
+                status=ToolStatus.NEEDS_CLARIFICATION,
+                message="Which command should I run?",
+            )
+            logger.info("Executor action needs clarification: result=%s", result_for_log(result))
+            return result
+        with session_scope() as session:
+            message = handle_command(session, command_text)
+        result = ToolExecutionResult(
+            tool="command",
+            operation=action.operation or "execute",
+            status=ToolStatus.SUCCESS,
+            message=message,
+            data={"command": command_text},
+        )
         logger.info("Executor action completed: result=%s", result_for_log(result))
         return result
     result = ToolExecutionResult(

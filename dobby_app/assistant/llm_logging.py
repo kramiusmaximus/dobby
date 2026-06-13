@@ -42,14 +42,21 @@ def action_plan_for_log(plan: Any) -> str:
         json.dumps(
             {
                 "confidence": plan.confidence,
-                "actions": [
+                "tasks": [
                     {
-                        "tool": action.tool,
-                        "operation": action.operation,
-                        "reason": action.reason,
-                        "arguments": action.arguments,
+                        "source_message_ids": task.source_message_ids,
+                        "reason": task.reason,
+                        "actions": [
+                            {
+                                "tool": action.tool,
+                                "operation": action.operation,
+                                "reason": action.reason,
+                                "arguments": action.arguments,
+                            }
+                            for action in task.actions
+                        ],
                     }
-                    for action in plan.actions
+                    for task in plan.tasks
                 ],
             },
             ensure_ascii=False,
